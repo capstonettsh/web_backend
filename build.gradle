@@ -24,6 +24,7 @@ dependencies {
     implementation 'org.java-websocket:Java-WebSocket:1.5.2'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
     implementation 'commons-io:commons-io:2.11.0'
+    implementation 'org.springframework.kafka:spring-kafka'
 
     implementation 'org.glassfish.tyrus.bundles:tyrus-standalone-client:1.18'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

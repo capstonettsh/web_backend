@@ -11,12 +11,15 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class VoiceWebSocketService extends BinaryWebSocketHandler {
 
     private ByteArrayOutputStream audioData;
     private HumeAIWebSocketClient humeAIClient;
+    private String userId = "1";
 
     @Autowired
     private ApplicationContext context;
@@ -34,8 +37,15 @@ public class VoiceWebSocketService extends BinaryWebSocketHandler {
                 "-4d99-9a93" +
                 "-b318b1352496");
 
-        humeAIClient = context.getBean(HumeAIWebSocketClient.class, humeUri, session);
+        humeAIClient = context.getBean(HumeAIWebSocketClient.class, humeUri, session, generateTopicName());
         humeAIClient.connectBlocking();
+    }
+
+    private String generateTopicName() {
+        String currentTime = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        // Replace colons in time to avoid issues in topic naming
+        currentTime = currentTime.replace(":", "-");
+        return currentTime + "_" + "humeai-data-testingasdfkjasdlkfj" + "_" + userId;
     }
 
     @Override
