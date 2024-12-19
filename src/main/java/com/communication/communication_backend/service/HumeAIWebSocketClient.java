@@ -1,5 +1,6 @@
 package com.communication.communication_backend.service;
 
+import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.java_websocket.client.WebSocketClient;
@@ -20,15 +21,14 @@ public class HumeAIWebSocketClient extends WebSocketClient {
     private final WebSocketSession frontendSession;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final int userId = 1;
-    private final String topicName;
+    private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
 
     public HumeAIWebSocketClient(URI serverUri, WebSocketSession frontendSession,
-                                 KafkaTemplate<String, String> kafkaTemplate, String topicName) {
+                                 KafkaTemplate<String, String> kafkaTemplate, ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
         super(serverUri);
         this.frontendSession = frontendSession;
         this.kafkaTemplate = kafkaTemplate;
-        this.topicName = topicName;
+        this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
     }
 
     @Override
@@ -54,19 +54,12 @@ public class HumeAIWebSocketClient extends WebSocketClient {
                 frontendSession.sendMessage(new TextMessage(message));
             }
 
-            kafkaTemplate.send(topicName, message);
+            kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeech(), message);
 
 
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private String generateTopicName() {
-        String currentTime = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        // Replace colons in time to avoid issues in topic naming
-        currentTime = currentTime.replace(":", "-");
-        return "test" + "_" + "humeai-data" + "_" + userId;
     }
 
     @Override

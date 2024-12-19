@@ -1,5 +1,6 @@
 package com.communication.communication_backend.service;
 
+import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
@@ -19,7 +20,9 @@ public class VoiceWebSocketService extends BinaryWebSocketHandler {
 
     private ByteArrayOutputStream audioData;
     private HumeAIWebSocketClient humeAIClient;
-    private String userId = "1";
+
+    @Autowired
+    private ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
 
     @Autowired
     private ApplicationContext context;
@@ -31,21 +34,24 @@ public class VoiceWebSocketService extends BinaryWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         // Initialize ByteArrayOutputStream to collect audio data
         audioData = new ByteArrayOutputStream();
-        System.out.println(humeAiApiKey);
+
+        String userId = "1";
+        String sessionDateTime = generateSessionDateTime();
+        toneAnalysisKafkaTopicName.setSessionDateTime(sessionDateTime);
+        toneAnalysisKafkaTopicName.setUserId(userId);
 
         URI humeUri = new URI("wss://api.hume.ai/v0/evi/chat?api_key=" + humeAiApiKey + "&config_id=cc18cb53-3f0e" +
                 "-4d99-9a93" +
                 "-b318b1352496");
 
-        humeAIClient = context.getBean(HumeAIWebSocketClient.class, humeUri, session, generateTopicName());
+        humeAIClient = context.getBean(HumeAIWebSocketClient.class, humeUri, session,
+                toneAnalysisKafkaTopicName);
         humeAIClient.connectBlocking();
     }
 
-    private String generateTopicName() {
-        String currentTime = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        // Replace colons in time to avoid issues in topic naming
-        currentTime = currentTime.replace(":", "-");
-        return currentTime + "_" + "humeai-data-testingasdfkjasdlkfj" + "_" + userId;
+    private String generateSessionDateTime() {
+        // Format the current datetime as yyyy-MM-ddTHH-mm-ss to avoid issues with colons
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss"));
     }
 
     @Override
