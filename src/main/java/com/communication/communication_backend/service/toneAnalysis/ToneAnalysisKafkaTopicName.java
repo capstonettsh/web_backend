@@ -1,18 +1,11 @@
 package com.communication.communication_backend.service.toneAnalysis;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
 public class ToneAnalysisKafkaTopicName {
-    private String sessionDateTime;
-    private String userId;
+    private final String sessionDateTime;
+    private final String userId;
 
-    public void setSessionDateTime(String sessionDateTime) {
+    public ToneAnalysisKafkaTopicName(String sessionDateTime, String userId) {
         this.sessionDateTime = sessionDateTime;
-    }
-
-    public void setUserId(String userId) {
         this.userId = userId;
     }
 
@@ -20,23 +13,19 @@ public class ToneAnalysisKafkaTopicName {
         return userId + "_" + sessionDateTime + "_hume-speech";
     }
 
-    @Bean
-    public String getHumeSpeech() {
+    public synchronized String getHumeSpeech() {
         return getBase();
     }
 
-    @Bean
-    public String getHumeSpeechShortened() {
+    public synchronized String getHumeSpeechShortened() {
         return getBase() + "-shortened";
     }
 
-    @Bean
-    public String getHumeSpeechExchange() {
+    public synchronized String getHumeSpeechExchange() {
         return getBase() + "-exchange";
     }
 
-    @Bean
-    public String getHumeSpeechGptResponse() {
+    public synchronized String getHumeSpeechGptResponse() {
         return getBase() + "-gpt-response";
     }
 }

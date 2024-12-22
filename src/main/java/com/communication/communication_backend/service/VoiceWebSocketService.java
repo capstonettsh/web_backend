@@ -1,6 +1,6 @@
 package com.communication.communication_backend.service;
 
-import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
+import com.communication.communication_backend.service.toneAnalysis.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
@@ -21,8 +21,10 @@ public class VoiceWebSocketService extends BinaryWebSocketHandler {
     private ByteArrayOutputStream audioData;
     private HumeAIWebSocketClient humeAIClient;
 
-    @Autowired
     private ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
+
+    @Autowired
+    private ToneAnalysisKafkaTopicNameFactory toneAnalysisKafkaTopicNameFactory;
 
     @Autowired
     private ApplicationContext context;
@@ -37,15 +39,19 @@ public class VoiceWebSocketService extends BinaryWebSocketHandler {
 
         String userId = "1";
         String sessionDateTime = generateSessionDateTime();
-        toneAnalysisKafkaTopicName.setSessionDateTime(sessionDateTime);
-        toneAnalysisKafkaTopicName.setUserId(userId);
+//        this.toneAnalysisKafkaTopicName = new ToneAnalysisKafkaTopicName(sessionDateTime, userId);
 
         URI humeUri = new URI("wss://api.hume.ai/v0/evi/chat?api_key=" + humeAiApiKey + "&config_id=cc18cb53-3f0e" +
                 "-4d99-9a93" +
                 "-b318b1352496");
 
+        toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
         humeAIClient = context.getBean(HumeAIWebSocketClient.class, humeUri, session,
                 toneAnalysisKafkaTopicName);
+
+        context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
+        context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
+        context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
         humeAIClient.connectBlocking();
     }
 

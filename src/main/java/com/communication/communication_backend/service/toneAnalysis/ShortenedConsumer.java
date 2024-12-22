@@ -2,21 +2,21 @@ package com.communication.communication_backend.service.toneAnalysis;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.KafkaMessageListenerContainer;
+import org.springframework.kafka.listener.MessageListener;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service
 public class ShortenedConsumer {
-
-    private final ExchangeProducer exchangeProducer;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Value("${exchanges.topic:exchanges}")
-    private String exchangesTopic;
 
     // Intermediate logs for debugging
     private final List<String> intermediateLogs = Collections.synchronizedList(new ArrayList<>());
@@ -29,14 +29,36 @@ public class ShortenedConsumer {
     private String currentBlockRole = null;
     private StringBuilder currentBlockContent = null;
     private Map<String, Double> currentBlockEmotions = null;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
+    private final ConsumerFactory<String, String> consumerFactory;
+    private final KafkaMessageListenerContainer<String, String> container;
 
-    public ShortenedConsumer(ExchangeProducer exchangeProducer) {
-        this.exchangeProducer = exchangeProducer;
+    public ShortenedConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+                             KafkaTemplate<String, String> kafkaTemplate,
+                             ConsumerFactory<String, String> consumerFactory) {
+        this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
+        this.kafkaTemplate = kafkaTemplate;
+        this.consumerFactory = consumerFactory;
+        this.container = createContainer();
+        this.container.start();
     }
 
-    @KafkaListener(topics = "shortened", groupId = "shortened-group")
+    private KafkaMessageListenerContainer<String, String> createContainer() {
+        ContainerProperties containerProperties = new ContainerProperties(toneAnalysisKafkaTopicName.getHumeSpeechShortened());
+        containerProperties.setMessageListener(new MessageListener<String, String>() {
+            @Override
+            public void onMessage(ConsumerRecord<String, String> record) {
+                consume(record.value());
+            }
+        });
+        containerProperties.setGroupId("shortened-group");
+        return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
+    }
+
     public void consume(String message) {
         intermediateLogs.add(message);
+        System.out.println("consume shortened message");
 
         try {
             JsonNode jsonNode = objectMapper.readTree(message);
@@ -147,7 +169,7 @@ public class ShortenedConsumer {
         exchange.put(secondRole, secondWithEmotions);
 
         String exchangeAsString = serializeExchange(exchange);
-        exchangeProducer.sendProcessedExchange(exchangeAsString, exchangesTopic);
+        kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), exchangeAsString);
     }
 
     private void produceSingleBlockExchange(String role, String content, Map<String, Double> emotions) {
@@ -157,7 +179,7 @@ public class ShortenedConsumer {
         exchange.put(role, withEmotions);
 
         String exchangeAsString = serializeExchange(exchange);
-        exchangeProducer.sendProcessedExchange(exchangeAsString, exchangesTopic);
+        kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), exchangeAsString);
     }
 
     private void mergeEmotions(Map<String, Double> target, Map<String, Double> source) {

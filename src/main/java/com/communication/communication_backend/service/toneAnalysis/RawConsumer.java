@@ -2,32 +2,60 @@ package com.communication.communication_backend.service.toneAnalysis;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Scope;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.KafkaMessageListenerContainer;
+import org.springframework.kafka.listener.MessageListener;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-@Service
 public class RawConsumer {
 
     // Consumes raw messages from Hume AI (with full tone data)
     // Extracts role, content, determines top 3 emotions, produces a shortened record to "shortened".
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ChatProducer chatProducer; // We'll reuse a ChatProducer-like class to send to shortened
+    private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ConsumerFactory<String, String> consumerFactory;
+    private final KafkaMessageListenerContainer<String, String> container;
+    private final List<String> messages = new CopyOnWriteArrayList<>();
 
-    @Value("${shortened.topic:shortened}")
-    private String shortenedTopic;
-
-    public RawConsumer(ChatProducer chatProducer) {
-        this.chatProducer = chatProducer;
+    public RawConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+                       KafkaTemplate<String, String> kafkaTemplate,
+                       ConsumerFactory<String, String> consumerFactory) {
+        this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
+        this.kafkaTemplate = kafkaTemplate;
+        this.consumerFactory = consumerFactory;
+        this.container = createContainer();
+        this.container.start(); // Start the container to begin consuming messages
     }
 
-    @KafkaListener(topics = "raw", groupId = "raw-group")
+    private KafkaMessageListenerContainer<String, String> createContainer() {
+        ContainerProperties containerProperties = new ContainerProperties(toneAnalysisKafkaTopicName.getHumeSpeech());
+        containerProperties.setMessageListener(new MessageListener<String, String>() {
+            @Override
+            public void onMessage(ConsumerRecord<String, String> record) {
+                consume(record.value());
+            }
+        });
+        containerProperties.setGroupId("raw-group"); // Set an appropriate group ID
+        return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
+    }
+
     public void consume(String record) {
+        System.out.println("testing for raw consumer please");
         try {
             JsonNode jsonNode = objectMapper.readTree(record);
+//            System.out.println(jsonNode);
 
             String type = jsonNode.has("type") ? jsonNode.get("type").asText() : "";
             if (!type.equals("assistant_message") && !type.equals("user_message")) {
@@ -71,7 +99,7 @@ public class RawConsumer {
             shortened.put("top_emotions", top3);
 
             String shortenedMessage = objectMapper.writeValueAsString(shortened);
-            chatProducer.sendMessage(shortenedMessage, shortenedTopic);
+            kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechShortened(), shortenedMessage);
 
         } catch (Exception e) {
             e.printStackTrace();

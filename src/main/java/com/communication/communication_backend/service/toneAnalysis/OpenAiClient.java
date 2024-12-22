@@ -17,7 +17,7 @@ public class OpenAiClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${openai.api.key:YOUR_OPENAI_API_KEY}")
+    @Value("${chatgpt.api.key}")
     private String apiKey;
 
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
