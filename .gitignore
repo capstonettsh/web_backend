@@ -39,3 +39,6 @@ out/
 /lib
 
 .env
+
+/received_images
+/recorded_videos

@@ -4,29 +4,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
-import org.springframework.stereotype.Service;
 
 public class ExchangesConsumer {
 
-    @Autowired
-    private OpenAiClient openAiClient;
-//    private final ChatGPTProducer chatGPTProducer;
+    //    private final ChatGPTProducer chatGPTProducer;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final KafkaTemplate<String, String> kafkaTemplate;
 
 //    @Value("${gpt.responses.topic:gpt-responses}")
 //    private String gptResponsesTopic;
-
-    private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private final ConsumerFactory<String, String> consumerFactory;
     private final KafkaMessageListenerContainer<String, String> container;
+    @Autowired
+    private OpenAiClient openAiClient;
 
     public ExchangesConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
                              KafkaTemplate<String, String> kafkaTemplate,
@@ -57,6 +53,7 @@ public class ExchangesConsumer {
 
             // Get empathy rating from ChatGPT
             String rating = openAiClient.getEmpathyRating(exchangeJson);
+            System.out.println("check chat gpt response" + rating);
 
             // Append rating to the exchange JSON
             JsonNode exchangeNode = objectMapper.readTree(exchangeJson);

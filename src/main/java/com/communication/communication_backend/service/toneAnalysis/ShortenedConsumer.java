@@ -3,14 +3,11 @@ package com.communication.communication_backend.service.toneAnalysis;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
-import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,19 +17,17 @@ public class ShortenedConsumer {
 
     // Intermediate logs for debugging
     private final List<String> intermediateLogs = Collections.synchronizedList(new ArrayList<>());
-
-    // Blocks
-    private String previousBlockRole = null;
-    private String previousBlockContent = null;
-    private Map<String, Double> previousBlockEmotions = null;
-
-    private String currentBlockRole = null;
-    private StringBuilder currentBlockContent = null;
-    private Map<String, Double> currentBlockEmotions = null;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private final ConsumerFactory<String, String> consumerFactory;
     private final KafkaMessageListenerContainer<String, String> container;
+    // Blocks
+    private String previousBlockRole = null;
+    private String previousBlockContent = null;
+    private Map<String, Double> previousBlockEmotions = null;
+    private String currentBlockRole = null;
+    private StringBuilder currentBlockContent = null;
+    private Map<String, Double> currentBlockEmotions = null;
 
     public ShortenedConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
                              KafkaTemplate<String, String> kafkaTemplate,
@@ -64,14 +59,14 @@ public class ShortenedConsumer {
             JsonNode jsonNode = objectMapper.readTree(message);
 
             // Detect end of conversation
-            String type = jsonNode.has("type") ? jsonNode.get("type").asText() : null;
-            if ("assistant_end".equals(type)) {
+            String role = jsonNode.has("role") ? jsonNode.get("role").asText() : null;
+            if ("assistant".equals(role)) {
                 // Conversation ended, flush what's left
                 flush();
                 return; // Stop processing since it's an end message
             }
 
-            String role = jsonNode.has("role") ? jsonNode.get("role").asText() : null;
+//            String role = jsonNode.has("role") ? jsonNode.get("role").asText() : null;
             String content = jsonNode.has("content") ? jsonNode.get("content").asText() : null;
 
             if (role == null || content == null) {
@@ -169,6 +164,7 @@ public class ShortenedConsumer {
         exchange.put(secondRole, secondWithEmotions);
 
         String exchangeAsString = serializeExchange(exchange);
+        System.out.println("produce exchange here1");
         kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), exchangeAsString);
     }
 
@@ -179,6 +175,7 @@ public class ShortenedConsumer {
         exchange.put(role, withEmotions);
 
         String exchangeAsString = serializeExchange(exchange);
+        System.out.println("produce exchange here2");
         kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), exchangeAsString);
     }
 

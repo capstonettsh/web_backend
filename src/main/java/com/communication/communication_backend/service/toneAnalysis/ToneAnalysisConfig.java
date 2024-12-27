@@ -1,14 +1,10 @@
 package com.communication.communication_backend.service.toneAnalysis;
 
-import com.communication.communication_backend.service.HumeAIWebSocketClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.web.socket.WebSocketSession;
-
-import java.net.URI;
 
 @Configuration
 public class ToneAnalysisConfig {

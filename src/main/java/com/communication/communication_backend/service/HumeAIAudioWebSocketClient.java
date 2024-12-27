@@ -13,18 +13,16 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
-public class HumeAIWebSocketClient extends WebSocketClient {
+public class HumeAIAudioWebSocketClient extends WebSocketClient {
 
     private final WebSocketSession frontendSession;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
 
-    public HumeAIWebSocketClient(URI serverUri, WebSocketSession frontendSession,
-                                 KafkaTemplate<String, String> kafkaTemplate, ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
+    public HumeAIAudioWebSocketClient(URI serverUri, WebSocketSession frontendSession,
+                                      KafkaTemplate<String, String> kafkaTemplate, ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
         super(serverUri);
         this.frontendSession = frontendSession;
         this.kafkaTemplate = kafkaTemplate;
@@ -33,8 +31,6 @@ public class HumeAIWebSocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        // Connection to Hume AI opened
-        System.out.println("Connected to Hume AI");
     }
 
     public void sendAudioData(byte[] audioData) {
@@ -48,7 +44,6 @@ public class HumeAIWebSocketClient extends WebSocketClient {
             // Parse the JSON message
             JsonNode rootNode = objectMapper.readTree(message);
             String type = rootNode.get("type").asText();
-//            System.out.println(message);
 
             if ("audio_output".equals(type)) {
                 frontendSession.sendMessage(new TextMessage(message));

@@ -1,5 +1,6 @@
 package com.communication.communication_backend.service;
 
+import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
 import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,8 +20,15 @@ public class WebSocketClientConfig {
 
     @Bean
     @Scope("prototype")
-    public HumeAIWebSocketClient humeAIWebSocketClient(URI serverUri, WebSocketSession frontendSession,
-                                                       ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
-        return new HumeAIWebSocketClient(serverUri, frontendSession, kafkaTemplate, toneAnalysisKafkaTopicName);
+    public HumeAIAudioWebSocketClient humeAIWebSocketClient(URI serverUri, WebSocketSession frontendSession,
+                                                            ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
+        return new HumeAIAudioWebSocketClient(serverUri, frontendSession, kafkaTemplate, toneAnalysisKafkaTopicName);
+    }
+
+    @Bean
+    @Scope("prototype")
+    public HumeAIExpressionManagementWebSocketClient humeAIExpressionManagementWebSocketClient(URI serverUri, WebSocketSession frontendSession,
+                                                                                               FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName) {
+        return new HumeAIExpressionManagementWebSocketClient(serverUri, frontendSession, kafkaTemplate, facialAnalysisKafkaTopicName);
     }
 }
