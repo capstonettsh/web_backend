@@ -22,4 +22,10 @@ public class FacialAnalysisConfig {
     public FacialRawConsumer facialRawConsumer(FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName) {
         return new FacialRawConsumer(facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory);
     }
+
+    @Bean
+    @Scope("prototype")
+    public FacialRankedConsumer facialRankedConsumer(FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName) {
+        return new FacialRankedConsumer(facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory);
+    }
 }

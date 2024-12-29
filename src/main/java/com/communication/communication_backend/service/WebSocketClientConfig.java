@@ -1,6 +1,7 @@
 package com.communication.communication_backend.service;
 
 import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
+import com.communication.communication_backend.service.facialAnalysis.HumeAIExpressionManagementWebSocketClient;
 import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

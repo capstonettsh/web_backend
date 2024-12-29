@@ -45,9 +45,9 @@ public class FacialRawConsumer {
     public void consume(String record) {
         try {
             List<String> topEmotions = processPrediction(record);
-            for (String emotion : topEmotions) {
-                kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceRanked(), emotion);
-            }
+//            for (String emotion : topEmotions) {
+            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceRanked(), topEmotions.toString());
+//            }
         } catch (Exception e) {
             System.err.println("Error processing message in RawConsumer: " + e.getMessage());
             e.printStackTrace();

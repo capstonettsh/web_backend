@@ -1,9 +1,7 @@
 package com.communication.communication_backend.service;
 
 import com.communication.communication_backend.config.AwsConfig;
-import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
-import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicNameFactory;
-import com.communication.communication_backend.service.facialAnalysis.FacialRawConsumer;
+import com.communication.communication_backend.service.facialAnalysis.*;
 import com.communication.communication_backend.service.toneAnalysis.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -89,9 +87,6 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         humeAudioClient = context.getBean(HumeAIAudioWebSocketClient.class, humeUri, session,
                 toneAnalysisKafkaTopicName);
 
-        context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
-        context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
-        context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
 
         humeAudioClient.connectBlocking();
 
@@ -105,7 +100,12 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 //
         humeAIExpressionManagementWebSocketClient.connectBlocking();
 
+        context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
+        context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
+        context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
+
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
+        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
 
 //        humeAIBatchProcessingClient = context.getBean(HumeAIBatchProcessingClient.class, humeAiApiKey);

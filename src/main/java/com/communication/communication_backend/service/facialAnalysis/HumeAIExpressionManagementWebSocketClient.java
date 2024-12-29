@@ -1,6 +1,5 @@
-package com.communication.communication_backend.service;
+package com.communication.communication_backend.service.facialAnalysis;
 
-import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.java_websocket.client.WebSocketClient;
