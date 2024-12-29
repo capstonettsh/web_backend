@@ -1,5 +1,6 @@
 package com.communication.communication_backend.service;
 
+import com.communication.communication_backend.config.AwsConfig;
 import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
 import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicNameFactory;
 import com.communication.communication_backend.service.facialAnalysis.FacialRawConsumer;
@@ -13,6 +14,9 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -45,6 +49,13 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
     @Value("${humeai.api.key}")
     private String humeAiApiKey;
+
+    @Autowired
+    private AwsConfig awsConfig;
+
+    @Autowired
+    private S3Client s3Client;
+
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -110,7 +121,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         }
     }
 
-    private void processMessage(WebSocketSession session, ByteBuffer payload) throws IOException {
+    private void processMessage(WebSocketSession session, ByteBuffer payload) throws IOException, InterruptedException {
         byte[] data = new byte[payload.remaining()];
         payload.get(data);
 
@@ -167,15 +178,76 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         // e.g., send to facial analysis service
     }
 
-    private void endChat() throws IOException {
-        // Save video data to file
-        if (videoData.size() > 0) {
-            String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
-            Files.createDirectories(Paths.get("recorded_videos"));
-            try (FileOutputStream fos = new FileOutputStream(videoPath)) {
-                fos.write(videoData.toByteArray());
+    private void endChat() throws IOException, InterruptedException {
+        String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
+        String audioPath = "recorded_audios/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
+        String combinedPath = "recorded_combined/" + sessionDateTime + "_" + System.currentTimeMillis() + "_combined.webm";
+        try {
+
+
+            if (videoData.size() > 0 && audioData.size() > 0) {
+                // Create directories
+                Files.createDirectories(Paths.get("recorded_videos"));
+                Files.createDirectories(Paths.get("recorded_audios"));
+                Files.createDirectories(Paths.get("recorded_combined"));
+
+                // Save video data to file
+
+                try (FileOutputStream fos = new FileOutputStream(videoPath)) {
+                    fos.write(videoData.toByteArray());
+                }
+
+                // Save audio data to file
+
+                try (FileOutputStream fos = new FileOutputStream(audioPath)) {
+                    fos.write(audioData.toByteArray());
+                }
+
+                // Path for the combined output
+
+
+                // Combine audio and video using FFmpeg
+                ProcessBuilder pb = new ProcessBuilder(
+                        "ffmpeg",
+                        "-i", videoPath,
+                        "-i", audioPath,
+                        "-c", "copy",
+                        combinedPath
+                );
+                Process process = pb.start();
+                process.waitFor();
+
+                String bucketName = awsConfig.getBucketName();
+                long timestamp = System.currentTimeMillis();
+
+                String sessionTimestamp = sessionDateTime + "_" + timestamp;
+                byte[] combinedData = Files.readAllBytes(Paths.get(combinedPath));
+                // Define S3 key for combined file
+                String combinedKey = "recorded_combined/" + sessionTimestamp + "_combined.webm";
+                // Upload combined file to S3
+                uploadToS3(bucketName, combinedKey, combinedData);
+            } else if (videoData.size() > 0) {
+//                String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
+                Files.createDirectories(Paths.get("recorded_videos"));
+                try (FileOutputStream fos = new FileOutputStream(videoPath)) {
+                    fos.write(videoData.toByteArray());
+                }
             }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            Files.delete(Paths.get(videoPath));
+            Files.delete(Paths.get(audioPath));
+            Files.delete(Paths.get(combinedPath));
         }
+    }
+
+    private void uploadToS3(String bucketName, String key, byte[] data) {
+        PutObjectRequest putObj = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+        s3Client.putObject(putObj, RequestBody.fromBytes(data));
     }
 
     @Override

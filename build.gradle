@@ -26,6 +26,8 @@ dependencies {
     implementation 'commons-io:commons-io:2.11.0'
     implementation 'org.springframework.kafka:spring-kafka'
 
+    implementation 'software.amazon.awssdk:s3:2.29.0'
+
     implementation 'org.glassfish.tyrus.bundles:tyrus-standalone-client:1.18'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
