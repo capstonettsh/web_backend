@@ -19,7 +19,7 @@ public class FacialOpenAiClient {
     private String apiKey;
 
     public FacialOpenAiClient() {
-        System.out.println("OpenAiClient initialized with API Key: " + (apiKey != null ? "Present" : "Missing"));
+//        System.out.println("OpenAiClient initialized with API Key: " + (apiKey != null ? "Present" : "Missing"));
     }
 
     public void testApiKey() {
@@ -28,15 +28,15 @@ public class FacialOpenAiClient {
 
     public String getEmpathyRating(String chunk) {
         // Debug the API key value
-        System.out.println("API Key from @Value annotation: " + (apiKey != null ? "Present" : "Missing"));
+//        System.out.println("API Key from @Value annotation: " + (apiKey != null ? "Present" : "Missing"));
 
         // Attempt to debug using environment variables
         String envApiKey = System.getenv("OPENAI_API_KEY");
-        System.out.println("API Key from environment variable: " + (envApiKey != null ? "Present" : "Missing"));
+//        System.out.println("API Key from environment variable: " + (envApiKey != null ? "Present" : "Missing"));
 
         // Debug both values
         if (apiKey == null || apiKey.isEmpty()) {
-            System.out.println("No API key found in @Value property. Attempting to use environment key.");
+//            System.out.println("No API key found in @Value property. Attempting to use environment key.");
             apiKey = envApiKey; // Fallback to environment variable
         }
 
@@ -62,8 +62,8 @@ public class FacialOpenAiClient {
      */
     private HttpHeaders buildHeaders() {
         // Debugging: Check if the API key is present
-        System.out.println("API Key: " + (apiKey != null ? "Present" : "Missing"));
-        System.out.println("Loaded API Key: " + apiKey);
+//        System.out.println("API Key: " + (apiKey != null ? "Present" : "Missing"));
+//        System.out.println("Loaded API Key: " + apiKey);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(apiKey); // Automatically sets "Authorization: Bearer <apiKey>"
@@ -100,7 +100,7 @@ public class FacialOpenAiClient {
         RestTemplate restTemplate = new RestTemplate();
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(API_URL, entity, String.class);
-            System.out.println("check this response" + response);
+//            System.out.println("check this response" + response);
             return response.getBody();
         } catch (Exception e) {
             System.err.println("Error processing chunk with ChatGPT: " + e.getMessage());
