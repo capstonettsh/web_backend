@@ -16,11 +16,10 @@ public class OpenAiClient {
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-
+    @Value("${chatgpt.api.url}")
+    private String API_URL;
     @Value("${chatgpt.api.key}")
     private String apiKey;
-
-    private static final String API_URL = "https://api.openai.com/v1/chat/completions";
 
     public OpenAiClient() {
         this.httpClient = HttpClient.newHttpClient();
@@ -33,7 +32,7 @@ public class OpenAiClient {
                 "\n\nProvide a rating between 1 and 10, with 10 being highly empathetic.";
 
         Map<String, Object> requestBody = Map.of(
-                "model", "gpt-4o-mini",
+                "model", "gpt-4",
                 "messages", List.of(
                         Map.of("role", "system", "content", "You are an empathy evaluator."),
                         Map.of("role", "user", "content", prompt)
@@ -50,12 +49,18 @@ public class OpenAiClient {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
                 .build();
 
+        System.out.println("chat gpt 1");
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
+        System.out.println("chat gpt 2");
         if (response.statusCode() == 200) {
+            System.out.println("chat gpt 3");
             Map<String, Object> responseBody = objectMapper.readValue(response.body(), Map.class);
+            System.out.println("chat gpt 4");
             List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
+            System.out.println("chat gpt 5");
             if (!choices.isEmpty()) {
+                System.out.println("chat gpt 6");
                 Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
                 return (String) message.get("content");
             }

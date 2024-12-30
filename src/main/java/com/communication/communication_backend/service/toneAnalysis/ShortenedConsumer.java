@@ -1,5 +1,6 @@
 package com.communication.communication_backend.service.toneAnalysis;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -9,25 +10,20 @@ import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ShortenedConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // Intermediate logs for debugging
-    private final List<String> intermediateLogs = Collections.synchronizedList(new ArrayList<>());
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private final ConsumerFactory<String, String> consumerFactory;
     private final KafkaMessageListenerContainer<String, String> container;
-    // Blocks
-    private String previousBlockRole = null;
-    private String previousBlockContent = null;
-    private Map<String, Double> previousBlockEmotions = null;
-    private String currentBlockRole = null;
-    private StringBuilder currentBlockContent = null;
-    private Map<String, Double> currentBlockEmotions = null;
+
+    private boolean isUserAppeared = false;
+    private boolean isAssistantAppeared = false;
+
+    private ToneShortened[] toneShortenedBuffer = new ToneShortened[0];
 
     public ShortenedConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
                              KafkaTemplate<String, String> kafkaTemplate,
@@ -52,7 +48,7 @@ public class ShortenedConsumer {
     }
 
     public void consume(String message) {
-        intermediateLogs.add(message);
+//        intermediateLogs.add(message);
         System.out.println("consume shortened message");
 
         try {
@@ -60,13 +56,6 @@ public class ShortenedConsumer {
 
             // Detect end of conversation
             String role = jsonNode.has("role") ? jsonNode.get("role").asText() : null;
-            if ("assistant".equals(role)) {
-                // Conversation ended, flush what's left
-                flush();
-                return; // Stop processing since it's an end message
-            }
-
-//            String role = jsonNode.has("role") ? jsonNode.get("role").asText() : null;
             String content = jsonNode.has("content") ? jsonNode.get("content").asText() : null;
 
             if (role == null || content == null) {
@@ -83,154 +72,113 @@ public class ShortenedConsumer {
                 });
             }
 
-            // Start or continue current block
-            if (currentBlockRole == null) {
-                // Initialize current block
-                currentBlockRole = role;
-                currentBlockContent = new StringBuilder(content);
-                currentBlockEmotions = new HashMap<>();
-                mergeEmotions(currentBlockEmotions, messageEmotions);
-            } else if (role.equals(currentBlockRole)) {
-                // Same role, accumulate
-                currentBlockContent.append(" ").append(content);
-                mergeEmotions(currentBlockEmotions, messageEmotions);
-            } else {
-                // Role changed, current block ended
-                finalizeCurrentBlockAndHandleRoleChange();
 
-                // Start new current block with the new role
-                currentBlockRole = role;
-                currentBlockContent = new StringBuilder(content);
-                currentBlockEmotions = new HashMap<>();
-                mergeEmotions(currentBlockEmotions, messageEmotions);
-            }
-
+            processShortenedMessage(new ToneShortened(role, content, messageEmotions));
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void processShortenedMessage(ToneShortened toneShortened) {
+        addToToneShortenedBuffer(toneShortened);
+
+        String role = toneShortened.role();
+
+        if (role.equals("user") && isUserAppeared && isAssistantAppeared) { // if user appeared again, then flush the message
+            flush();
+        } else {
+            // update state
+            if (role.equals("user")) {
+                isUserAppeared = true;
+            } else if (role.equals("assistant")) {
+                isAssistantAppeared = true;
+            }
+        }
+    }
+
+    private void addToToneShortenedBuffer(ToneShortened newElement) {
+        if (toneShortenedBuffer == null) {
+            toneShortenedBuffer = new ToneShortened[]{newElement};
+        } else {
+            ToneShortened[] newBuffer = new ToneShortened[toneShortenedBuffer.length + 1];
+            System.arraycopy(toneShortenedBuffer, 0, newBuffer, 0, toneShortenedBuffer.length);
+            newBuffer[toneShortenedBuffer.length] = newElement;
+            toneShortenedBuffer = newBuffer;
         }
     }
 
     // Call this method at the end of the conversation or on "assistant_end"
     // You'll need to detect "assistant_end" messages in consume() and then call flush()
     public void flush() {
-        // If we still have a current block
-        if (currentBlockRole != null) {
-            // If there's a previous block, form an exchange
-            if (previousBlockRole != null) {
-                produceExchange(previousBlockRole, previousBlockContent, previousBlockEmotions,
-                        currentBlockRole, currentBlockContent.toString(), currentBlockEmotions);
-                clearPreviousBlock();
-            } else {
-                // Just produce a single-block exchange from current block
-                produceSingleBlockExchange(currentBlockRole, currentBlockContent.toString(), currentBlockEmotions);
+        ExchangeMessage exchangeMessage = produceExchangeMessage();
+
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            String jsonMessage = objectMapper.writeValueAsString(exchangeMessage);
+            kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), jsonMessage);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+
+        toneShortenedBuffer = new ToneShortened[0];
+        isUserAppeared = false;
+        isAssistantAppeared = false;
+    }
+
+    private ExchangeMessage produceExchangeMessage() {
+        StringBuilder userMessageBuilder = new StringBuilder();
+        StringBuilder assistantMessageBuilder = new StringBuilder();
+
+        // Aggregate messages from the buffer based on role
+        for (ToneShortened ts : toneShortenedBuffer) {
+            String contentWithEmotions = appendEmotionsToContent(ts.content(), ts.messageEmotions());
+            if ("user".equalsIgnoreCase(ts.role())) {
+                userMessageBuilder.append(contentWithEmotions).append(" ");
+            } else if ("assistant".equalsIgnoreCase(ts.role())) {
+                assistantMessageBuilder.append(contentWithEmotions).append(" ");
             }
-            clearCurrentBlock();
-        } else if (previousBlockRole != null) {
-            // If we have only a previous block and no current block, produce single-block exchange
-            produceSingleBlockExchange(previousBlockRole, previousBlockContent, previousBlockEmotions);
-            clearPreviousBlock();
-        }
-    }
-
-    private void finalizeCurrentBlockAndHandleRoleChange() {
-        // currentBlock just finished
-        if (previousBlockRole == null) {
-            // Store currentBlock as previousBlock, waiting for a next block to form an exchange
-            previousBlockRole = currentBlockRole;
-            previousBlockContent = currentBlockContent.toString();
-            previousBlockEmotions = new HashMap<>(currentBlockEmotions);
-        } else {
-            // We have a previous block and now a current block ended
-            // produce exchange from previousBlock and currentBlock
-            produceExchange(previousBlockRole, previousBlockContent, previousBlockEmotions,
-                    currentBlockRole, currentBlockContent.toString(), currentBlockEmotions);
-
-            // Clear previousBlock after producing exchange
-            clearPreviousBlock();
         }
 
-        // Clear currentBlock after moving it
-        clearCurrentBlock();
+        String userMessage = userMessageBuilder.toString().trim();
+        String assistantMessage = assistantMessageBuilder.toString().trim();
+
+        ExchangeMessage exchangeMessage = new ExchangeMessage(userMessage, assistantMessage);
+        return exchangeMessage;
     }
 
-    private void produceExchange(String firstRole, String firstContent, Map<String, Double> firstEmotions,
-                                 String secondRole, String secondContent, Map<String, Double> secondEmotions) {
-
-        String firstWithEmotions = appendEmotionsToContent(firstContent, firstEmotions);
-        String secondWithEmotions = appendEmotionsToContent(secondContent, secondEmotions);
-
-        LinkedHashMap<String, String> exchange = new LinkedHashMap<>();
-        exchange.put(firstRole, firstWithEmotions);
-        exchange.put(secondRole, secondWithEmotions);
-
-        String exchangeAsString = serializeExchange(exchange);
-        System.out.println("produce exchange here1");
-        kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), exchangeAsString);
-    }
-
-    private void produceSingleBlockExchange(String role, String content, Map<String, Double> emotions) {
-        String withEmotions = appendEmotionsToContent(content, emotions);
-
-        LinkedHashMap<String, String> exchange = new LinkedHashMap<>();
-        exchange.put(role, withEmotions);
-
-        String exchangeAsString = serializeExchange(exchange);
-        System.out.println("produce exchange here2");
-        kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechExchange(), exchangeAsString);
-    }
-
-    private void mergeEmotions(Map<String, Double> target, Map<String, Double> source) {
-        for (Map.Entry<String, Double> e : source.entrySet()) {
-            target.put(e.getKey(), target.getOrDefault(e.getKey(), 0.0) + e.getValue());
-        }
-    }
-
-    private String appendEmotionsToContent(String content, Map<String, Double> emotions) {
-        if (emotions.isEmpty()) {
+    private String appendEmotionsToContent(String content, Map<String, Double> messageEmotions) {
+        if (messageEmotions == null || messageEmotions.isEmpty()) {
             return content;
         }
 
-        // pick top 3 emotions by value
-        List<Map.Entry<String, Double>> sorted = emotions.entrySet().stream()
-                .sorted((e1, e2) -> Double.compare(e2.getValue(), e1.getValue()))
-                .limit(3)
-                .collect(Collectors.toList());
+        // Format emotions as "emotion1=score1, emotion2=score2, ..."
+        StringBuilder emotionsBuilder = new StringBuilder("[Emotions: ");
+        messageEmotions.forEach((emotion, score) -> {
+            emotionsBuilder.append(emotion).append("=").append(String.format("%.2f", score)).append(", ");
+        });
 
-        StringBuilder emotionString = new StringBuilder(" (");
-        for (Map.Entry<String, Double> e : sorted) {
-            emotionString.append(e.getKey()).append(": ")
-                    .append(String.format("%.2f", e.getValue())).append(", ");
+        // Remove the trailing comma and space
+        if (emotionsBuilder.length() > 11) { // Length of "[Emotions: "
+            emotionsBuilder.setLength(emotionsBuilder.length() - 2);
         }
-        emotionString.setLength(emotionString.length() - 2);
-        emotionString.append(")");
+        emotionsBuilder.append("]");
 
-        return content + emotionString;
-    }
+        // Split content into sentences (simple split based on period)
+        String[] sentences = content.split("(?<=[.!?])\\s+");
+        StringBuilder contentWithEmotions = new StringBuilder();
 
-    private String serializeExchange(Map<String, String> exchange) {
-        try {
-            return objectMapper.writeValueAsString(exchange);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "{}";
+        for (String sentence : sentences) {
+            contentWithEmotions.append(sentence.trim()).append(" ").append(emotionsBuilder).append(" ");
         }
+
+        return contentWithEmotions.toString().trim();
     }
 
-    private void clearPreviousBlock() {
-        previousBlockRole = null;
-        previousBlockContent = null;
-        previousBlockEmotions = null;
+    public void endChat() {
+        flush();
     }
 
-    private void clearCurrentBlock() {
-        currentBlockRole = null;
-        currentBlockContent = null;
-        currentBlockEmotions = null;
-    }
-
-    public List<String> getIntermediateLogs() {
-        synchronized (intermediateLogs) {
-            return new ArrayList<>(intermediateLogs);
-        }
+    private record ExchangeMessage(String userMessage, String assistantMessage) {
     }
 }

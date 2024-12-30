@@ -35,6 +35,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private HumeAIAudioWebSocketClient humeAudioClient;
     private ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private ByteArrayOutputStream audioData;
+    private ShortenedConsumer shortenedConsumer;
     @Autowired
     private FacialAnalysisKafkaTopicNameFactory facialAnalysisKafkaTopicNameFactory;
     //    private HumeAIExpressionManagementWebSocketClient humeAIExpressionManagementWebSocketClient;
@@ -97,11 +98,11 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
         facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
         humeAIExpressionManagementWebSocketClient = context.getBean(HumeAIExpressionManagementWebSocketClient.class, humeExpressionManagementUri, session, facialAnalysisKafkaTopicName);
-//
+
         humeAIExpressionManagementWebSocketClient.connectBlocking();
 
         context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
-        context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
+        shortenedConsumer = context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
         context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
 
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
@@ -179,6 +180,8 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     }
 
     private void endChat() throws IOException, InterruptedException {
+        shortenedConsumer.endChat();
+
         String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
         String audioPath = "recorded_audios/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
         String combinedPath = "recorded_combined/" + sessionDateTime + "_" + System.currentTimeMillis() + "_combined.webm";

@@ -2,6 +2,7 @@ package com.communication.communication_backend.service.toneAnalysis;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -11,13 +12,8 @@ import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
 
 public class ExchangesConsumer {
-
-    //    private final ChatGPTProducer chatGPTProducer;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final KafkaTemplate<String, String> kafkaTemplate;
-
-//    @Value("${gpt.responses.topic:gpt-responses}")
-//    private String gptResponsesTopic;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private final ConsumerFactory<String, String> consumerFactory;
     private final KafkaMessageListenerContainer<String, String> container;
@@ -58,11 +54,11 @@ public class ExchangesConsumer {
             // Append rating to the exchange JSON
             JsonNode exchangeNode = objectMapper.readTree(exchangeJson);
             // Convert to ObjectNode to add a field
-            com.fasterxml.jackson.databind.node.ObjectNode node = (com.fasterxml.jackson.databind.node.ObjectNode) exchangeNode;
+            ObjectNode node = (ObjectNode) exchangeNode;
             node.put("rating", rating);
 
             String updatedExchange = objectMapper.writeValueAsString(node);
-            System.out.println(updatedExchange);
+            System.out.println("check updated exchange " + updatedExchange);
 
             // Send updated exchange to GPT responses topic
             kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechGptResponse(), updatedExchange);
