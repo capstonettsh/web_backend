@@ -28,6 +28,11 @@ dependencies {
 
     implementation 'software.amazon.awssdk:s3:2.29.0'
 
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
     implementation 'org.glassfish.tyrus.bundles:tyrus-standalone-client:1.18'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
