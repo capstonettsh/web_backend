@@ -22,6 +22,8 @@ public class ShortenedConsumer {
 
     private boolean isUserAppeared = false;
     private boolean isAssistantAppeared = false;
+    private int startTime = 0;
+    private int endTime = 0;
 
     private ToneShortened[] toneShortenedBuffer = new ToneShortened[0];
 
@@ -73,15 +75,13 @@ public class ShortenedConsumer {
             }
 
 
-            processShortenedMessage(new ToneShortened(role, content, messageEmotions));
+            processShortenedMessage(new ToneShortened(role, content, messageEmotions, jsonNode));
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private void processShortenedMessage(ToneShortened toneShortened) {
-        addToToneShortenedBuffer(toneShortened);
-
         String role = toneShortened.role();
 
         if (role.equals("user") && isUserAppeared && isAssistantAppeared) { // if user appeared again, then flush the message
@@ -94,6 +94,17 @@ public class ShortenedConsumer {
                 isAssistantAppeared = true;
             }
         }
+
+
+        if (role.equals("user") && startTime == 0 && toneShortened.jsonNode().has("userBeginTime")) {
+            startTime = toneShortened.jsonNode().get("userBeginTime").asInt();
+        }
+
+        if (role.equals("user") && toneShortened.jsonNode().has("userEndTime")) {
+            endTime = toneShortened.jsonNode().get("userEndTime").asInt();
+        }
+
+        addToToneShortenedBuffer(toneShortened);
     }
 
     private void addToToneShortenedBuffer(ToneShortened newElement) {
@@ -124,6 +135,8 @@ public class ShortenedConsumer {
         toneShortenedBuffer = new ToneShortened[0];
         isUserAppeared = false;
         isAssistantAppeared = false;
+        startTime = 0;
+        endTime = 0;
     }
 
     private ExchangeMessage produceExchangeMessage() {
@@ -143,7 +156,7 @@ public class ShortenedConsumer {
         String userMessage = userMessageBuilder.toString().trim();
         String assistantMessage = assistantMessageBuilder.toString().trim();
 
-        ExchangeMessage exchangeMessage = new ExchangeMessage(userMessage, assistantMessage);
+        ExchangeMessage exchangeMessage = new ExchangeMessage(userMessage, assistantMessage, this.startTime, this.endTime);
         return exchangeMessage;
     }
 
@@ -179,6 +192,6 @@ public class ShortenedConsumer {
         flush();
     }
 
-    private record ExchangeMessage(String userMessage, String assistantMessage) {
+    private record ExchangeMessage(String userMessage, String assistantMessage, int userBeginTime, int userEndTime) {
     }
 }

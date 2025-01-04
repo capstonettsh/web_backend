@@ -11,8 +11,6 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 public class HumeAIAudioWebSocketClient extends WebSocketClient {
 
@@ -45,6 +43,7 @@ public class HumeAIAudioWebSocketClient extends WebSocketClient {
             JsonNode rootNode = objectMapper.readTree(message);
             String type = rootNode.get("type").asText();
 
+//            System.out.println(message);
             if ("audio_output".equals(type)) {
                 frontendSession.sendMessage(new TextMessage(message));
             }
@@ -57,29 +56,29 @@ public class HumeAIAudioWebSocketClient extends WebSocketClient {
         }
     }
 
-    @Override
-    public void onMessage(ByteBuffer bytes) {
-        // Handle binary messages from Hume AI
-        try {
-            // Convert ByteBuffer to byte array
-            byte[] data = new byte[bytes.remaining()];
-            bytes.get(data);
-
-            // Convert binary data to string (assuming UTF-8 encoding)
-            String message = new String(data, StandardCharsets.UTF_8);
-
-            // Parse the message
-            JsonNode rootNode = objectMapper.readTree(message);
-            String type = rootNode.get("type").asText();
-
-            if ("audio_output".equals(type)) {
-                frontendSession.sendMessage(new TextMessage(message));
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+//    @Override
+//    public void onMessage(ByteBuffer bytes) {
+//        // Handle binary messages from Hume AI
+//        try {
+//            // Convert ByteBuffer to byte array
+//            byte[] data = new byte[bytes.remaining()];
+//            bytes.get(data);
+//
+//            // Convert binary data to string (assuming UTF-8 encoding)
+//            String message = new String(data, StandardCharsets.UTF_8);
+//
+//            // Parse the message
+//            JsonNode rootNode = objectMapper.readTree(message);
+//            String type = rootNode.get("type").asText();
+//
+//            if ("audio_output".equals(type)) {
+//                frontendSession.sendMessage(new TextMessage(message));
+//            }
+//
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
 
     public void closeStream() {
         // Send any final messages if required by Hume AI before closing

@@ -3,16 +3,11 @@ package com.communication.communication_backend.service.toneAnalysis;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Scope;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
-import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -92,8 +87,14 @@ public class RawConsumer {
                             (a, b) -> a, LinkedHashMap::new
                     ));
 
-            // Create shortened JSON
             Map<String, Object> shortened = new HashMap<>();
+
+            // put start time if type is user_message
+            if (type.equals("user_message")) {
+                shortened.put("userBeginTime", jsonNode.get("time").get("begin").asText());
+                shortened.put("userEndTime", jsonNode.get("time").get("end").asText());
+            }
+
             shortened.put("role", role);
             shortened.put("content", content);
             shortened.put("top_emotions", top3);
