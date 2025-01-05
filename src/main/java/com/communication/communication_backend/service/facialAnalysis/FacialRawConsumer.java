@@ -10,6 +10,7 @@ import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +46,14 @@ public class FacialRawConsumer {
     public void consume(String record) {
         try {
             List<String> topEmotions = processPrediction(record);
-//            for (String emotion : topEmotions) {
-            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceRanked(), topEmotions.toString());
-//            }
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            // Create a JSON object with "emotions" as the key
+            String jsonEmotions = objectMapper.writeValueAsString(Collections.singletonMap("emotions", topEmotions));
+
+            // Send the JSON string to Kafka
+            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceRanked(), jsonEmotions);
+
         } catch (Exception e) {
             System.err.println("Error processing message in RawConsumer: " + e.getMessage());
             e.printStackTrace();

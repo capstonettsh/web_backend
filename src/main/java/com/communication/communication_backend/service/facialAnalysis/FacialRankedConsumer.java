@@ -13,6 +13,7 @@ import org.springframework.kafka.listener.MessageListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class FacialRankedConsumer {
 
@@ -53,20 +54,27 @@ public class FacialRankedConsumer {
             System.out.println("Processing chunk with ChatGPT: " + chunk);
 
             // Send chunk to ChatGPT and get response
-            String gptResponse = facialOpenAiClient.getEmpathyRating(chunk);
+            FacialOpenAi gptResponse = facialOpenAiClient.getEmpathyRating(chunk);
+            System.out.println(gptResponse);
 
-            // Extract "content" field from GPT response
-            String content = extractContentFromResponse(gptResponse);
+            // Parse the chunk into a JSON node
+            JsonNode jsonNode = objectMapper.readTree(chunk);
 
-            // Append chunk-response pair to gptResponses
-            String chunkResponsePair = chunk.trim() + System.lineSeparator() + System.lineSeparator() + content.trim();
-            synchronized (gptResponses) {
-                gptResponses.add(chunkResponsePair);
-            }
+            // Create the JSON schema
+            Map<String, Object> jsonSchema = Map.of(
+                    "emotions", jsonNode.get("emotions"),
+                    "rating", gptResponse.rating(),
+                    "reasoning", gptResponse.reasoning()
+            );
 
-            // Send response to gpt-rated-emotions topic
-            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceGPTResponse(), gptResponse);
-//            System.out.println("Sent GPT response to topic: " + gptTopic);
+            // Convert the schema map to a JSON string using ObjectMapper
+            ObjectMapper objectMapper = new ObjectMapper();
+            String jsonString = objectMapper.writeValueAsString(jsonSchema);
+
+            // Send the JSON string to the gpt-rated-emotions topic
+            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceGPTResponse(), jsonString);
+            System.out.println("Sent GPT response to topic: " + facialAnalysisKafkaTopicName.getHumeFaceGPTResponse());
+
         } catch (Exception e) {
             System.err.println("Error processing chunk with ChatGPT: " + e.getMessage());
             e.printStackTrace();
