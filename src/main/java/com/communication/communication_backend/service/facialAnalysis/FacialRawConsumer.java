@@ -10,7 +10,6 @@ import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,23 +35,32 @@ public class FacialRawConsumer {
         containerProperties.setMessageListener(new MessageListener<String, String>() {
             @Override
             public void onMessage(ConsumerRecord<String, String> record) {
-                consume(record.value());
+                long offset = record.offset();
+                consume(record.value(), offset);
             }
         });
         containerProperties.setGroupId("facial-raw-group");
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 
-    public void consume(String record) {
+    public void consume(String record, long offset) {
         try {
             List<String> topEmotions = processPrediction(record);
 
+            // Calculate startTime
+            long startTime = (offset + 1) * 300;
+
+            // Create a JSON object with "emotions" and "startTime" as the keys
+            Map<String, Object> outputMap = new HashMap<>();
+            outputMap.put("emotions", topEmotions);
+            outputMap.put("startTime", startTime);
+
+            // Convert the map to a JSON string
             ObjectMapper objectMapper = new ObjectMapper();
-            // Create a JSON object with "emotions" as the key
-            String jsonEmotions = objectMapper.writeValueAsString(Collections.singletonMap("emotions", topEmotions));
+            String jsonEmotionsWithTime = objectMapper.writeValueAsString(outputMap);
 
             // Send the JSON string to Kafka
-            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceRanked(), jsonEmotions);
+            kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceRanked(), jsonEmotionsWithTime);
 
         } catch (Exception e) {
             System.err.println("Error processing message in RawConsumer: " + e.getMessage());

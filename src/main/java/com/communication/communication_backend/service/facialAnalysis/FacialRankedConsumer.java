@@ -63,6 +63,7 @@ public class FacialRankedConsumer {
             // Create the JSON schema
             Map<String, Object> jsonSchema = Map.of(
                     "emotions", jsonNode.get("emotions"),
+                    "startTime", jsonNode.get("startTime"),
                     "rating", gptResponse.rating(),
                     "reasoning", gptResponse.reasoning()
             );
