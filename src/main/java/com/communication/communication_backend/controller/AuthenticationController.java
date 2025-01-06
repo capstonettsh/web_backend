@@ -21,6 +21,7 @@ public class AuthenticationController {
 
     @PostMapping("/token")
     public ResponseEntity<CognitoTokenResponseDto> exchangeCodeForTokens(@RequestParam String code) {
+        System.out.println("code here nice");
         return cognitoAuthService.exchangeCodeForTokens(code);
     }
 }

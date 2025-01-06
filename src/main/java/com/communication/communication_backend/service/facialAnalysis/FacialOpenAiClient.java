@@ -92,7 +92,8 @@ public class FacialOpenAiClient {
                 Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
                 // The assistant's response is a JSON string matching the schema
                 String contentJson = (String) message.get("content");
-                JsonNode contentNode = objectMapper.readTree(contentJson);
+                System.out.println(contentJson);
+                JsonNode contentNode = objectMapper.readTree(contentJson); // debug this line
                 if (contentNode.has("rating") && contentNode.has("reasoning")) {
                     String rating = contentNode.get("rating").asText();
                     String reasoning = contentNode.get("reasoning").asText();
@@ -100,6 +101,7 @@ public class FacialOpenAiClient {
                 }
             }
         } else {
+            System.out.println();
             throw new RuntimeException("Error: " + response.statusCode() + " - " + response.body());
         }
 

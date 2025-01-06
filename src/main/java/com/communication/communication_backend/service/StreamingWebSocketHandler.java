@@ -2,34 +2,47 @@ package com.communication.communication_backend.service;
 
 import com.communication.communication_backend.config.AwsConfig;
 import com.communication.communication_backend.service.facialAnalysis.*;
+import com.communication.communication_backend.service.overallFeedback.GptResponseConsumer;
+import com.communication.communication_backend.service.overallFeedback.OverallFeedbackExchangesConsumer;
+import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicName;
+import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicNameFactory;
 import com.communication.communication_backend.service.toneAnalysis.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.BinaryMessage;
+import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Utilities;
+import software.amazon.awssdk.services.s3.model.GetUrlRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private final String userId = "1";
+    private WebSocketSession webSocketSession;
     @Autowired
     private ToneAnalysisKafkaTopicNameFactory toneAnalysisKafkaTopicNameFactory;
     private HumeAIAudioWebSocketClient humeAudioClient;
@@ -42,7 +55,15 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName;
     private ByteArrayOutputStream videoData;
     private HumeAIExpressionManagementWebSocketClient humeAIExpressionManagementWebSocketClient;
+
+    @Autowired
+    private OverallFeedbackKafkaTopicNameFactory overallFeedbackKafkaTopicNameFactory;
+    private OverallFeedbackKafkaTopicName overallFeedbackKafkaTopicName;
     private String sessionDateTime;
+
+    private GptResponseConsumer gptResponseConsumer;
+    private OverallFeedbackExchangesConsumer overallFeedbackExchangesConsumer;
+    private ExchangesConsumer exchangesConsumer;
     @Autowired
     private ApplicationContext context;
 
@@ -55,10 +76,13 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     @Autowired
     private S3Client s3Client;
 
+    private JsonNode overallFeedback;
+
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         super.afterConnectionEstablished(session);
+        this.webSocketSession = session;
 
         URI uri = session.getUri();
         System.out.println(uri);
@@ -83,16 +107,17 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         String userId = "1";
 
         URI humeUri = new URI("wss://api.hume.ai/v0/evi/chat?api_key=" + humeAiApiKey + "&config_id=cd796b48-001c-4b9e-a813-bbd079c9d20d");
+        URI humeExpressionManagementUri = new URI("wss://api.hume.ai/v0/stream/models?api_key=" + humeAiApiKey);
 
         toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
+        facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
+        overallFeedbackKafkaTopicName = overallFeedbackKafkaTopicNameFactory.create(sessionDateTime, userId);
+
         humeAudioClient = context.getBean(HumeAIAudioWebSocketClient.class, humeUri, session,
                 toneAnalysisKafkaTopicName);
 
 
         humeAudioClient.connectBlocking();
-
-        // configure facial analysis
-        URI humeExpressionManagementUri = new URI("wss://api.hume.ai/v0/stream/models?api_key=" + humeAiApiKey);
 
         videoData = new ByteArrayOutputStream();
 
@@ -103,13 +128,13 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
         context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
         shortenedConsumer = context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
-        context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
+        this.exchangesConsumer = context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
 
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
         context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
-
-//        humeAIBatchProcessingClient = context.getBean(HumeAIBatchProcessingClient.class, humeAiApiKey);
+        gptResponseConsumer = context.getBean(GptResponseConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
+        overallFeedbackExchangesConsumer = context.getBean(OverallFeedbackExchangesConsumer.class, toneAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
     }
 
     @Override
@@ -180,7 +205,31 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     }
 
     private void endChat() throws IOException, InterruptedException {
-        shortenedConsumer.endChat();
+        CompletableFuture.runAsync(() -> shortenedConsumer.endChat())
+                .thenRun(() -> {
+                    try {
+                        Thread.sleep(3000);
+                        System.out.println("sleeping 5000 ms");
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .thenRun(() -> this.overallFeedback = exchangesConsumer.endChat())
+//                .thenRun(() -> {
+//                    try {
+//                        Thread.sleep(5000);
+//                    } catch (InterruptedException e) {
+//                        throw new RuntimeException(e);
+//                    }
+//                })
+//                .thenRun(() -> overallFeedbackExchangesConsumer.endChat())
+//                .thenRun(() -> gptResponseConsumer.endChat())
+                .join(); // Wait for the chain to complete
+//        System.out.println("reach here 123");
+//        overallFeedbackExchangesConsumer.endChat();
+
+        System.out.println("check overall feedback");
+        System.out.println(this.overallFeedback);
 
         String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
         String audioPath = "recorded_audios/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
@@ -229,6 +278,29 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                 String combinedKey = "recorded_combined/" + sessionTimestamp + "_combined.webm";
                 // Upload combined file to S3
                 uploadToS3(bucketName, combinedKey, combinedData);
+
+                // Generate S3 URL
+                S3Utilities s3Utilities = s3Client.utilities();
+                GetUrlRequest urlRequest = GetUrlRequest.builder()
+                        .bucket(bucketName)
+                        .key(combinedKey)
+                        .build();
+                URL s3Url = s3Utilities.getUrl(urlRequest);
+                String s3UrlString = s3Url.toString();
+
+                // Construct JSON message
+                ObjectMapper mapper = new ObjectMapper();
+                ObjectNode jsonMessage = (ObjectNode) this.overallFeedback;
+//                ObjectNode jsonMessage = mapper.createObjectNode();
+                jsonMessage.put("type", "backend_message");
+                jsonMessage.put("videoLink", s3UrlString);
+                String messageStr = mapper.writeValueAsString(jsonMessage);
+
+                // Send JSON message to client
+                if (webSocketSession != null && webSocketSession.isOpen()) {
+                    webSocketSession.sendMessage(new TextMessage(messageStr));
+                }
+
             } else if (videoData.size() > 0) {
 //                String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
                 Files.createDirectories(Paths.get("recorded_videos"));

@@ -40,6 +40,7 @@ startAVButton.addEventListener('click', async () => {
         };
 
         socket.onmessage = function(event) {
+            console.log("testing")
             if (typeof event.data === 'string') {
                 // Parse the JSON message
                 var message = JSON.parse(event.data);
@@ -52,7 +53,13 @@ startAVButton.addEventListener('click', async () => {
 
                     // Play the audio
                     playAudio(audioData);
-                } else {
+                } else if (message.type === 'backend_message') {
+                      console.log("Overall Feedback Received:", message);
+                      console.log("Video Link:", message.videoLink);
+
+                      // Optionally, display the video link in the UI
+                      // ...
+                }  else {
                     // Handle other message types if necessary
                     console.log("Received message:", message);
                 }

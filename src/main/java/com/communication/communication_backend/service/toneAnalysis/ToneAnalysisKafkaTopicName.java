@@ -28,4 +28,8 @@ public class ToneAnalysisKafkaTopicName {
     public synchronized String getHumeSpeechGptResponse() {
         return getBase() + "-gpt-response";
     }
+
+    public synchronized String getOverallFeedback() {
+        return getBase() + "-overall-feedback";
+    }
 }

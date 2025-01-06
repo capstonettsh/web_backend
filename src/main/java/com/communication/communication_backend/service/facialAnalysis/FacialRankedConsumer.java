@@ -51,11 +51,8 @@ public class FacialRankedConsumer {
 
     public void consume(String chunk) {
         try {
-            System.out.println("Processing chunk with ChatGPT: " + chunk);
-
             // Send chunk to ChatGPT and get response
-            FacialOpenAi gptResponse = facialOpenAiClient.getEmpathyRating(chunk);
-            System.out.println(gptResponse);
+            FacialOpenAi gptResponse = facialOpenAiClient.getEmpathyRating(chunk.replace("\"", "\\\""));
 
             // Parse the chunk into a JSON node
             JsonNode jsonNode = objectMapper.readTree(chunk);
@@ -74,7 +71,6 @@ public class FacialRankedConsumer {
 
             // Send the JSON string to the gpt-rated-emotions topic
             kafkaTemplate.send(facialAnalysisKafkaTopicName.getHumeFaceGPTResponse(), jsonString);
-            System.out.println("Sent GPT response to topic: " + facialAnalysisKafkaTopicName.getHumeFaceGPTResponse());
 
         } catch (Exception e) {
             System.err.println("Error processing chunk with ChatGPT: " + e.getMessage());
