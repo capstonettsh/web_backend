@@ -26,9 +26,7 @@ import software.amazon.awssdk.services.s3.S3Utilities;
 import software.amazon.awssdk.services.s3.model.GetUrlRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -193,11 +191,11 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
     private void processImageData(WebSocketSession session, byte[] message) throws IOException {
         // Example processing: Save the image to a directory
-        String imagePath = "received_images/" + sessionDateTime + "_" + System.currentTimeMillis() + ".jpg";
-        Files.createDirectories(Paths.get("received_images"));
-        try (FileOutputStream fos = new FileOutputStream(imagePath)) {
-            fos.write(message);
-        }
+//        String imagePath = "received_images/" + sessionDateTime + "_" + System.currentTimeMillis() + ".jpg";
+//        Files.createDirectories(Paths.get("received_images"));
+//        try (FileOutputStream fos = new FileOutputStream(imagePath)) {
+//            fos.write(message);
+//        }
         humeAIExpressionManagementWebSocketClient.sendImage(Base64.getEncoder().encodeToString(message));
 
         // Add additional processing logic here
@@ -228,15 +226,14 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 //        System.out.println("reach here 123");
 //        overallFeedbackExchangesConsumer.endChat();
 
-        System.out.println("check overall feedback");
-        System.out.println(this.overallFeedback);
+//        System.out.println("check overall feedback");
+//        System.out.println(this.overallFeedback);
 
-        String videoPath = "recorded_videos/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
-        String audioPath = "recorded_audios/" + sessionDateTime + "_" + System.currentTimeMillis() + ".webm";
-        String combinedPath = "recorded_combined/" + sessionDateTime + "_" + System.currentTimeMillis() + "_combined.webm";
+        long currentTime = System.currentTimeMillis();
+        String videoPath = "recorded_videos/" + sessionDateTime + "_" + currentTime + ".webm";
+        String audioPath = "recorded_audios/" + sessionDateTime + "_" + currentTime + ".webm";
+        String combinedPath = "recorded_combined/" + sessionDateTime + "_" + currentTime + "_combined.webm";
         try {
-
-
             if (videoData.size() > 0 && audioData.size() > 0) {
                 // Create directories
                 Files.createDirectories(Paths.get("recorded_videos"));
@@ -266,13 +263,26 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                         "-c", "copy",
                         combinedPath
                 );
+                pb.redirectErrorStream(true);
                 Process process = pb.start();
-                process.waitFor();
+
+                // Capture FFmpeg output
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println(line);
+                    }
+                }
+
+                int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    throw new RuntimeException("FFmpeg failed with exit code " + exitCode);
+                }
 
                 String bucketName = awsConfig.getBucketName();
-                long timestamp = System.currentTimeMillis();
+//                long timestamp = System.currentTimeMillis();
 
-                String sessionTimestamp = sessionDateTime + "_" + timestamp;
+                String sessionTimestamp = sessionDateTime + "_" + currentTime;
                 byte[] combinedData = Files.readAllBytes(Paths.get(combinedPath));
                 // Define S3 key for combined file
                 String combinedKey = "recorded_combined/" + sessionTimestamp + "_combined.webm";
@@ -296,6 +306,9 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                 jsonMessage.put("videoLink", s3UrlString);
                 String messageStr = mapper.writeValueAsString(jsonMessage);
 
+                System.out.println("check message");
+                System.out.println(messageStr);
+
                 // Send JSON message to client
                 if (webSocketSession != null && webSocketSession.isOpen()) {
                     webSocketSession.sendMessage(new TextMessage(messageStr));
@@ -311,9 +324,9 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            Files.delete(Paths.get(videoPath));
-            Files.delete(Paths.get(audioPath));
-            Files.delete(Paths.get(combinedPath));
+//            Files.delete(Paths.get(videoPath));
+//            Files.delete(Paths.get(audioPath));
+//            Files.delete(Paths.get(combinedPath));
         }
     }
 

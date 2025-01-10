@@ -32,7 +32,7 @@ public class CognitoAuthService {
                 + "grant_type=authorization_code" +
                 "&client_id=" + clientId +
                 "&code=" + code +
-                "&redirect_uri=http://localhost:3000/callback";
+                "&redirect_uri=https://frontend.itor-sg.com/callback";
 
         String authenticationInfo = clientId + ":" + clientSecret;
         String basicAuthenticationInfo = Base64.getEncoder().encodeToString(authenticationInfo.getBytes());
