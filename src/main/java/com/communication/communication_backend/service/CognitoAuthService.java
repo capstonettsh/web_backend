@@ -32,7 +32,7 @@ public class CognitoAuthService {
                 + "grant_type=authorization_code" +
                 "&client_id=" + clientId +
                 "&code=" + code +
-                "&redirect_uri=https://frontend.itor-sg.com/callback";
+                "&redirect_uri=" + redirectUri;
 
         String authenticationInfo = clientId + ":" + clientSecret;
         String basicAuthenticationInfo = Base64.getEncoder().encodeToString(authenticationInfo.getBytes());
@@ -59,6 +59,49 @@ public class CognitoAuthService {
 
         if (response.statusCode() != 200) {
             throw new RuntimeException("Authentication failed");
+        }
+
+        CognitoTokenResponseDto token;
+        try {
+            token = JSON_MAPPER.readValue(response.body(), CognitoTokenResponseDto.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Unable to decode Cognito response");
+        }
+
+        return ResponseEntity.ok(token);
+    }
+
+    public ResponseEntity<CognitoTokenResponseDto> refreshAccessToken(String refreshToken) {
+        String urlStr = tokenUri;
+
+        String authenticationInfo = clientId + ":" + clientSecret;
+        String basicAuthenticationInfo = Base64.getEncoder().encodeToString(authenticationInfo.getBytes());
+
+        String form = "grant_type=refresh_token"
+                + "&client_id=" + clientId
+                + "&refresh_token=" + refreshToken;
+
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder(new URI(urlStr))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .header("Authorization", "Basic " + basicAuthenticationInfo)
+                    .POST(HttpRequest.BodyPublishers.ofString(form))
+                    .build();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException("Unable to build Cognito URL");
+        }
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpResponse<String> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Unable to request Cognito");
+        }
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Token refresh failed");
         }
 
         CognitoTokenResponseDto token;

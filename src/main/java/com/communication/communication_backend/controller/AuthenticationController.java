@@ -24,4 +24,10 @@ public class AuthenticationController {
         System.out.println("code here nice");
         return cognitoAuthService.exchangeCodeForTokens(code);
     }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<CognitoTokenResponseDto> refreshAccessToken(@RequestParam String refreshToken) {
+        System.out.println("Refreshing access token.");
+        return cognitoAuthService.refreshAccessToken(refreshToken);
+    }
 }
