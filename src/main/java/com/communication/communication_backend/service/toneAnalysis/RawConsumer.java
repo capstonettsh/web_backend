@@ -42,7 +42,7 @@ public class RawConsumer {
                 consume(record.value());
             }
         });
-        containerProperties.setGroupId("raw-group"); // Set an appropriate group ID
+        containerProperties.setGroupId(toneAnalysisKafkaTopicName.getHumeSpeech()); // Set an appropriate group ID
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 

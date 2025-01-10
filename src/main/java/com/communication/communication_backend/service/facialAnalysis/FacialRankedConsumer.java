@@ -45,7 +45,7 @@ public class FacialRankedConsumer {
                 consume(record.value());
             }
         });
-        containerProperties.setGroupId("facial-raw-group");
+        containerProperties.setGroupId(facialAnalysisKafkaTopicName.getHumeFaceRanked());
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 

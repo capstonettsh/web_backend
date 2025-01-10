@@ -39,7 +39,7 @@ public class FacialRawConsumer {
                 consume(record.value(), offset);
             }
         });
-        containerProperties.setGroupId("facial-raw-group");
+        containerProperties.setGroupId(facialAnalysisKafkaTopicName.getHumeFace());
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 

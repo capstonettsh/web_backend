@@ -45,7 +45,7 @@ public class ShortenedConsumer {
                 consume(record.value());
             }
         });
-        containerProperties.setGroupId("shortened-group");
+        containerProperties.setGroupId(toneAnalysisKafkaTopicName.getHumeSpeechShortened());
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 

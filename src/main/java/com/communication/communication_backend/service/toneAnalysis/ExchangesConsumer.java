@@ -25,7 +25,7 @@ public class ExchangesConsumer {
     @Autowired
     private FinalOpenAiClient finalOpenAiClient;
 
-    private Queue<JsonNode> jsonNodeQueue = new LinkedList<JsonNode>();
+    private final Queue<JsonNode> jsonNodeQueue = new LinkedList<>();
 
     public ExchangesConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
                              KafkaTemplate<String, String> kafkaTemplate,
@@ -45,7 +45,7 @@ public class ExchangesConsumer {
                 consume(record.value());
             }
         });
-        containerProperties.setGroupId("exchange-group");
+        containerProperties.setGroupId(toneAnalysisKafkaTopicName.getHumeSpeechExchange());
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 
