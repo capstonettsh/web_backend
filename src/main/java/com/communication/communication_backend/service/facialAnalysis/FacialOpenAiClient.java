@@ -70,8 +70,7 @@ public class FacialOpenAiClient {
                 "response_format", Map.of(
                         "type", "json_schema",
                         "json_schema", jsonSchema
-                ),
-                "max_tokens", 100
+                )
         );
 
         String requestBodyJson = objectMapper.writeValueAsString(requestBody);
@@ -87,6 +86,7 @@ public class FacialOpenAiClient {
 
         if (response.statusCode() == 200) {
             Map<String, Object> responseBody = objectMapper.readValue(response.body(), Map.class);
+            System.out.println(responseBody);
             List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
             if (!choices.isEmpty()) {
                 Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
