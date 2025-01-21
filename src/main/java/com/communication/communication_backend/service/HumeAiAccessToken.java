@@ -27,7 +27,6 @@ public class HumeAiAccessToken {
             // Encode API key and secret key as Base64
 
             String credentials = humeApiKey + ":" + humeSecretKey;
-            System.out.println(credentials);
             String encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes());
 
             // Create the HTTP client
@@ -41,11 +40,8 @@ public class HumeAiAccessToken {
                     .POST(HttpRequest.BodyPublishers.ofString("grant_type=client_credentials"))
                     .build();
 
-            // Send the request and get the response
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            System.out.println(response);
 
-            // Parse the JSON response to extract the access token
             if (response.statusCode() == 200) {
                 ObjectMapper objectMapper = new ObjectMapper();
                 Map<String, Object> responseBody = objectMapper.readValue(response.body(), Map.class);
