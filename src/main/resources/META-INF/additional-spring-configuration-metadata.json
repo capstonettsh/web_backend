@@ -1,0 +1,47 @@
+{"properties": [
+  {
+    "name": "humeai.api.key",
+    "type": "java.lang.String",
+    "description": "A description for 'humeai.api.key'"
+  },
+  {
+    "name": "document.upload-directory",
+    "type": "java.lang.String",
+    "description": "A description for 'document.upload-directory'"
+  },
+  {
+    "name": "chatgpt.api.key",
+    "type": "java.lang.String",
+    "description": "A description for 'chatgpt.api.key'"
+  },
+  {
+    "name": "cloud.aws.credentials.accessKey",
+    "type": "java.lang.String",
+    "description": "A description for 'cloud.aws.credentials.accessKey'"
+  },
+  {
+    "name": "chatgpt.api.url",
+    "type": "java.lang.String",
+    "description": "A description for 'chatgpt.api.url'"
+  },
+  {
+    "name": "cloud.aws.s3.bucket",
+    "type": "java.lang.String",
+    "description": "A description for 'cloud.aws.s3.bucket'"
+  },
+  {
+    "name": "cloud.aws.region.static",
+    "type": "java.lang.String",
+    "description": "A description for 'cloud.aws.region.static'"
+  },
+  {
+    "name": "cloud.aws.credentials.secretKey",
+    "type": "java.lang.String",
+    "description": "A description for 'cloud.aws.credentials.secretKey'"
+  },
+  {
+    "name": "ServicePointManager.DefaultConnectionLimit",
+    "type": "java.lang.String",
+    "description": "A description for 'ServicePointManager.DefaultConnectionLimit'"
+  }
+]}

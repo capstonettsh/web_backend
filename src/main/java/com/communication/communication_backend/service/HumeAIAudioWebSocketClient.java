@@ -1,0 +1,103 @@
+package com.communication.communication_backend.service;
+
+import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+
+import java.io.IOException;
+import java.net.URI;
+
+public class HumeAIAudioWebSocketClient extends WebSocketClient {
+
+    private final WebSocketSession frontendSession;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
+
+    public HumeAIAudioWebSocketClient(URI serverUri, WebSocketSession frontendSession,
+                                      KafkaTemplate<String, String> kafkaTemplate, ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
+        super(serverUri);
+        this.frontendSession = frontendSession;
+        this.kafkaTemplate = kafkaTemplate;
+        this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
+    }
+
+    @Override
+    public void onOpen(ServerHandshake handshakedata) {
+    }
+
+    public void sendAudioData(byte[] audioData) {
+        send(audioData);
+    }
+
+    @Override
+    public void onMessage(String message) {
+        // Handle text messages from Hume AI
+        try {
+            // Parse the JSON message
+            JsonNode rootNode = objectMapper.readTree(message);
+            String type = rootNode.get("type").asText();
+
+//            System.out.println(message);
+            if ("audio_output".equals(type)) {
+                frontendSession.sendMessage(new TextMessage(message));
+            }
+
+            kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeech(), message);
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+//    @Override
+//    public void onMessage(ByteBuffer bytes) {
+//        // Handle binary messages from Hume AI
+//        try {
+//            // Convert ByteBuffer to byte array
+//            byte[] data = new byte[bytes.remaining()];
+//            bytes.get(data);
+//
+//            // Convert binary data to string (assuming UTF-8 encoding)
+//            String message = new String(data, StandardCharsets.UTF_8);
+//
+//            // Parse the message
+//            JsonNode rootNode = objectMapper.readTree(message);
+//            String type = rootNode.get("type").asText();
+//
+//            if ("audio_output".equals(type)) {
+//                frontendSession.sendMessage(new TextMessage(message));
+//            }
+//
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
+
+    public void closeStream() {
+        // Send any final messages if required by Hume AI before closing
+        try {
+            String endMessage = "{\"type\":\"end_stream\"}";
+            send(endMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        close();
+    }
+
+    @Override
+    public void onClose(int code, String reason, boolean remote) {
+        System.out.println("Hume AI WebSocket closed: " + reason);
+    }
+
+    @Override
+    public void onError(Exception ex) {
+        ex.printStackTrace();
+    }
+}
