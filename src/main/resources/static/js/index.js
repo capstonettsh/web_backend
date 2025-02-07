@@ -136,8 +136,30 @@ stopAVButton.addEventListener('click', () => {
 
     if (socket && socket.readyState === WebSocket.OPEN) {
 //        socket.close();
+
         const messageType = new Uint8Array([0x04]); // Ending signal type
-        socket.send(messageType.buffer);
+        const messageData = "1988678a-81a8-44db-aa9f-e04b89c5e72f";
+
+        // Convert the string to Uint8Array
+        const encoder = new TextEncoder();
+        const messageDataBytes = encoder.encode(messageData);
+
+        // Create the final message array
+        const message = new Uint8Array(messageType.length + messageDataBytes.length);
+        message.set(messageType);
+        message.set(messageDataBytes, messageType.length);
+
+        // Send the message buffer
+        socket.send(message.buffer);
+
+//                  const arrayBuffer = this.result;
+//                  const messageType = new Uint8Array([0x03]); // Screenshot message type
+//                  const messageData = new Uint8Array(arrayBuffer);
+//                  const message = new Uint8Array(messageType.length + messageData.length);
+//                  message.set(messageType);
+//                  message.set(messageData, messageType.length);
+//                  socket.send(message.buffer);
+//        socket.send(messageType.buffer);
         console.log("sent 0x04 ending signal to backend");
     }
 

@@ -10,6 +10,8 @@ import com.communication.communication_backend.service.toneAnalysis.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.nimbusds.jose.shaded.gson.JsonObject;
+import com.nimbusds.jose.shaded.gson.JsonParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
@@ -30,7 +32,12 @@ import java.io.*;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Base64;
@@ -43,7 +50,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private WebSocketSession webSocketSession;
     @Autowired
     private ToneAnalysisKafkaTopicNameFactory toneAnalysisKafkaTopicNameFactory;
-    private HumeAIAudioWebSocketClient humeAudioClient;
+    //    private HumeAIAudioWebSocketClient humeAudioClient;
     private ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private ByteArrayOutputStream audioData;
     private ShortenedConsumer shortenedConsumer;
@@ -75,6 +82,75 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private S3Client s3Client;
 
     private JsonNode overallFeedback;
+
+    private void downloadAudioFile(String signedAudioUrl, String outputFilePath) throws IOException, InterruptedException {
+        // Create the HTTP request to download the audio file
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(signedAudioUrl))
+                .GET()
+                .build();
+
+        // Send the request and get the response as an InputStream
+        HttpClient client = HttpClient.newHttpClient();
+        HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+        // Check if the response is successful
+        if (response.statusCode() == 200) {
+            // Ensure the output directory exists
+            Files.createDirectories(Paths.get(outputFilePath).getParent());
+
+            // Save the audio file to the specified path
+            try (InputStream inputStream = response.body();
+                 FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+            }
+        } else {
+            throw new IOException("Failed to download audio file. HTTP Status: " + response.statusCode());
+        }
+    }
+
+    private String getSignedAudioUrl(String chatId) throws IOException, InterruptedException {
+        // Build the URL for the Hume AI API
+        String url = String.format("https://api.hume.ai/v0/evi/chats/%s/audio",
+                URLEncoder.encode(chatId, StandardCharsets.UTF_8));
+
+        HttpClient client = HttpClient.newHttpClient();
+
+        // Loop until we get a non-null signed_audio_url
+        while (true) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("X-Hume-Api-Key", humeAiApiKey)
+                    .header("Content-Type", "application/json")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                String responseBody = response.body();
+                System.out.println(responseBody);
+                JsonObject jsonObject = JsonParser.parseString(responseBody).getAsJsonObject();
+
+                // Check that the signed_audio_url key exists and its value is not null
+                if (jsonObject.has("signed_audio_url")) {
+                    if (!jsonObject.get("signed_audio_url").isJsonNull()) {
+                        return jsonObject.get("signed_audio_url").getAsString();
+                    }
+                } else {
+                    throw new IOException("signed_audio_url not found in the response");
+                }
+            } else {
+                throw new IOException("Failed to fetch audio metadata. HTTP Status: " + response.statusCode());
+            }
+            // Wait for 500ms before trying again to avoid a tight loop.
+            Thread.sleep(500);
+        }
+    }
 
 
     @Override
@@ -111,11 +187,11 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
         overallFeedbackKafkaTopicName = overallFeedbackKafkaTopicNameFactory.create(sessionDateTime, userId);
 
-        humeAudioClient = context.getBean(HumeAIAudioWebSocketClient.class, humeUri, session,
-                toneAnalysisKafkaTopicName);
-
-
-        humeAudioClient.connectBlocking();
+//        humeAudioClient = context.getBean(HumeAIAudioWebSocketClient.class, humeUri, session,
+//                toneAnalysisKafkaTopicName);
+//
+//
+//        humeAudioClient.connectBlocking();
 
         videoData = new ByteArrayOutputStream();
 
@@ -163,7 +239,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
         if (messageType == 0x01) {
             // Audio data
-            processAudioData(session, mediaData);
+//            processAudioData(session, mediaData);
         } else if (messageType == 0x02) {
             // Video data
             processVideoData(session, mediaData);
@@ -171,7 +247,25 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
             // Screenshot image
             processImageData(session, mediaData);
         } else if (messageType == 0x04) {
-            endChat();
+            // Ending signal with payload format: "chatId:msDifference"
+            String payloadString = new String(mediaData, StandardCharsets.UTF_8);
+            String[] parts = payloadString.split(":");
+            if (parts.length != 2) {
+                System.err.println("Invalid end chat message format. Expected 'chatId:msDifference', got: " + payloadString);
+                return;
+            }
+
+            String chatId = parts[0];
+            long msDifference;
+            try {
+                msDifference = Long.parseLong(parts[1]);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid millisecond difference value: " + parts[1]);
+                return;
+            }
+
+            // Now you can use chatId and msDifference as needed.
+            endChat(chatId, msDifference);
         } else {
             System.err.println("Unknown message type received: " + messageType);
         }
@@ -180,9 +274,9 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private void processAudioData(WebSocketSession session, byte[] message) throws IOException {
         audioData.write(message);
 
-        if (humeAudioClient != null && humeAudioClient.isOpen()) {
-            humeAudioClient.sendAudioData(message);
-        }
+//        if (humeAudioClient != null && humeAudioClient.isOpen()) {
+//            humeAudioClient.sendAudioData(message);
+//        }
     }
 
     private void processVideoData(WebSocketSession session, byte[] message) throws IOException {
@@ -202,8 +296,12 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         // e.g., send to facial analysis service
     }
 
-    private void endChat() throws IOException, InterruptedException {
-        CompletableFuture.runAsync(() -> shortenedConsumer.endChat())
+    private void endChat(String chatId, long msDifference) throws IOException, InterruptedException {
+        CompletableFuture.runAsync(() -> {
+                    HumeAiChatReader humeAiChatReader = context.getBean(HumeAiChatReader.class, toneAnalysisKafkaTopicName);
+                    humeAiChatReader.setChatId(chatId);
+                })
+                .thenRun(() -> shortenedConsumer.endChat())
                 .thenRun(() -> {
                     try {
                         Thread.sleep(3000);
@@ -213,54 +311,38 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                     }
                 })
                 .thenRun(() -> this.overallFeedback = exchangesConsumer.endChat())
-//                .thenRun(() -> {
-//                    try {
-//                        Thread.sleep(5000);
-//                    } catch (InterruptedException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                })
-//                .thenRun(() -> overallFeedbackExchangesConsumer.endChat())
-//                .thenRun(() -> gptResponseConsumer.endChat())
-                .join(); // Wait for the chain to complete
-//        System.out.println("reach here 123");
-//        overallFeedbackExchangesConsumer.endChat();
-
-//        System.out.println("check overall feedback");
-//        System.out.println(this.overallFeedback);
+                .join();
 
         long currentTime = System.currentTimeMillis();
         String videoPath = "recorded_videos/" + sessionDateTime + "_" + currentTime + ".webm";
         String audioPath = "recorded_audios/" + sessionDateTime + "_" + currentTime + ".webm";
         String combinedPath = "recorded_combined/" + sessionDateTime + "_" + currentTime + "_combined.webm";
         try {
-            if (videoData.size() > 0 && audioData.size() > 0) {
+            if (videoData.size() > 0) {
                 // Create directories
                 Files.createDirectories(Paths.get("recorded_videos"));
                 Files.createDirectories(Paths.get("recorded_audios"));
                 Files.createDirectories(Paths.get("recorded_combined"));
 
-                // Save video data to file
+                String signedAudioUrl = getSignedAudioUrl(chatId);
+                downloadAudioFile(signedAudioUrl, audioPath);
 
                 try (FileOutputStream fos = new FileOutputStream(videoPath)) {
                     fos.write(videoData.toByteArray());
                 }
 
-                // Save audio data to file
-
-                try (FileOutputStream fos = new FileOutputStream(audioPath)) {
-                    fos.write(audioData.toByteArray());
-                }
-
-                // Path for the combined output
-
+                double offsetSeconds = (double) (msDifference / 1000.0);
 
                 // Combine audio and video using FFmpeg
                 ProcessBuilder pb = new ProcessBuilder(
                         "ffmpeg",
                         "-i", videoPath,
+                        "-itsoffset", String.valueOf(offsetSeconds),
                         "-i", audioPath,
-                        "-c", "copy",
+                        "-map", "0:v",         // use video from first input
+                        "-map", "1:a",         // use audio from second input
+                        "-c:v", "copy",
+                        "-c:a", "libopus",
                         combinedPath
                 );
                 pb.redirectErrorStream(true);
@@ -280,7 +362,6 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                 }
 
                 String bucketName = awsConfig.getBucketName();
-//                long timestamp = System.currentTimeMillis();
 
                 String sessionTimestamp = sessionDateTime + "_" + currentTime;
                 byte[] combinedData = Files.readAllBytes(Paths.get(combinedPath));
@@ -343,9 +424,9 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         super.afterConnectionClosed(session, status);
 
         // Close Hume AI clients
-        if (humeAudioClient != null && humeAudioClient.isOpen()) {
-            humeAudioClient.close();
-        }
+//        if (humeAudioClient != null && humeAudioClient.isOpen()) {
+//            humeAudioClient.close();
+//        }
 
 //        if (humeAIBatchProcessingClient != null) {
 //            humeAIBatchProcessingClient.shutdown();

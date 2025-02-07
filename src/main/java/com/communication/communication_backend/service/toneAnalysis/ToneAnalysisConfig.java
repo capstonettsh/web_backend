@@ -34,4 +34,10 @@ public class ToneAnalysisConfig {
     public ExchangesConsumer exchangesConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
         return new ExchangesConsumer(toneAnalysisKafkaTopicName, kafkaTemplate, consumerFactory);
     }
+
+    @Bean
+    @Scope("prototype")
+    public HumeAiChatReader humeAiChatReader(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
+        return new HumeAiChatReader(kafkaTemplate, toneAnalysisKafkaTopicName);
+    }
 }
