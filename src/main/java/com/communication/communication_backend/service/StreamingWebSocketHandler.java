@@ -1,7 +1,10 @@
 package com.communication.communication_backend.service;
 
 import com.communication.communication_backend.config.AwsConfig;
-import com.communication.communication_backend.service.facialAnalysis.*;
+import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
+import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicNameFactory;
+import com.communication.communication_backend.service.facialAnalysis.FacialRawConsumer;
+import com.communication.communication_backend.service.facialAnalysis.HumeAIExpressionManagementWebSocketClient;
 import com.communication.communication_backend.service.overallFeedback.GptResponseConsumer;
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackExchangesConsumer;
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicName;
@@ -205,7 +208,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         this.exchangesConsumer = context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
 
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
-        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
+//        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
         gptResponseConsumer = context.getBean(GptResponseConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
         overallFeedbackExchangesConsumer = context.getBean(OverallFeedbackExchangesConsumer.class, toneAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
