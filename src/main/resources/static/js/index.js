@@ -262,7 +262,7 @@ audioContext.decodeAudioData(arrayBuffer)
     });
 }
 
-// send screenshot every 300ms
+// send screenshot every 600ms
 const canvasElement = document.createElement('canvas');
 const context = canvasElement.getContext('2d');
 
@@ -295,8 +295,8 @@ const sendScreenshot = () => {
   }
 };
 
-// Start sending screenshots every 300ms
-let screenshotInterval = setInterval(sendScreenshot, 300);
+// Start sending screenshots every 600ms
+let screenshotInterval = setInterval(sendScreenshot, 600);
 
 // Make sure to clear the interval when stopping the video
 stopAVButton.addEventListener('click', () => {
