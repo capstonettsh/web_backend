@@ -48,7 +48,7 @@ public class FacialRawConsumer {
             List<String> topEmotions = processPrediction(record);
 
             // Calculate startTime
-            long startTime = (offset + 1) * 300;
+            long startTime = (offset + 1) * 600;
 
             // Create a JSON object with "emotions" and "startTime" as the keys
             Map<String, Object> outputMap = new HashMap<>();
