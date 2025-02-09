@@ -20,7 +20,7 @@ import java.util.*;
 
 public class GptResponseConsumer {
 
-    private static final int FACIAL_INTERVAL = 300;
+    private static final int FACIAL_INTERVAL = 600;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private final FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName;
