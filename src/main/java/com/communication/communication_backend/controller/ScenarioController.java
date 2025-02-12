@@ -3,11 +3,11 @@ package com.communication.communication_backend.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.communication.communication_backend.service.creatingScenarios.Scenario;
 import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
-import com.communication.communication_backend.service.creatingScenarios.ScenarioSummary;
 import com.communication.communication_backend.dtos.GeneratedScenarioDto;
 import com.communication.communication_backend.dtos.MarkingSchemaDto;
+import com.communication.communication_backend.dtos.Scenario;
+import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.communication.communication_backend.service.creatingScenarios.ScenariosOpenAiClient;
 import com.fasterxml.jackson.databind.JsonNode;
 

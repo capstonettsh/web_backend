@@ -135,7 +135,6 @@ public class OverallFeedbackOpenAiClient {
         requestBody.put("messages", messages);
         requestBody.put("response_format", responseFormat);
         requestBody.put("temperature", 1);
-        requestBody.put("max_completion_tokens", 2048);
         requestBody.put("top_p", 1);
         requestBody.put("frequency_penalty", 0);
         requestBody.put("presence_penalty", 0);

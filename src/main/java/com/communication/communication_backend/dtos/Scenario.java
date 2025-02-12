@@ -1,4 +1,4 @@
-package com.communication.communication_backend.service.creatingScenarios;
+package com.communication.communication_backend.dtos;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -4,6 +4,8 @@ import org.springframework.stereotype.Service;
 
 import com.communication.communication_backend.dtos.GeneratedScenarioDto;
 import com.communication.communication_backend.dtos.MarkingSchemaDto;
+import com.communication.communication_backend.dtos.Scenario;
+import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.*;
