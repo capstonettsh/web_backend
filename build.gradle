@@ -41,6 +41,8 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    implementation 'mysql:mysql-connector-j:9.2.0'
 }
 
 tasks.named('test') {
