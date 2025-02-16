@@ -1,13 +1,10 @@
 package com.communication.communication_backend.service.creatingScenarios;
 
 import org.springframework.stereotype.Service;
-
-import com.communication.communication_backend.dtos.GeneratedScenarioDto;
-import com.communication.communication_backend.dtos.MarkingSchemaDto;
-import com.communication.communication_backend.dtos.Scenario;
-import com.communication.communication_backend.dtos.ScenarioSummary;
+import com.communication.communication_backend.dtos.*;
+import com.communication.communication_backend.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
-
+import jakarta.transaction.Transactional;
 import java.util.*;
 
 @Service
@@ -15,137 +12,160 @@ public class ScenarioService {
 
     private final ScenariosOpenAiClient openAiClient;
     private final RubricsOpenAiClient rubricsOpenAiClient;
+    private final ScenarioRepository scenarioRepository;
+    private final GeneratedScenarioRepository generatedScenarioRepository;
+    private final MarkingSchemaRepository markingSchemaRepository;
 
-    // In-memory storage for simplicity; replace with SQL database later
-    private final Map<Integer, Scenario> scenarios = new HashMap<>();
-    private final Map<Integer, GeneratedScenarioDto> generatedScenarios = new HashMap<>();
-    private final Map<Integer, List<MarkingSchemaDto>> markingSchemas = new HashMap<>(); // Storing marking schemas
-
-    public ScenarioService(ScenariosOpenAiClient openAiClient, RubricsOpenAiClient rubricsOpenAiClient) {
+    public ScenarioService(
+            ScenariosOpenAiClient openAiClient,
+            RubricsOpenAiClient rubricsOpenAiClient,
+            ScenarioRepository scenarioRepository,
+            GeneratedScenarioRepository generatedScenarioRepository,
+            MarkingSchemaRepository markingSchemaRepository) {
         this.openAiClient = openAiClient;
         this.rubricsOpenAiClient = rubricsOpenAiClient;
+        this.scenarioRepository = scenarioRepository;
+        this.generatedScenarioRepository = generatedScenarioRepository;
+        this.markingSchemaRepository = markingSchemaRepository;
     }
 
-    // Initialize a new configId
+    // Initialize a new scenario with an auto-generated configId
     public int initializeConfigId() {
-        int newConfigId = new Random().nextInt(10000);  // Simulated ID generation
-        scenarios.put(newConfigId, new Scenario(newConfigId, "", "", ""));
-        return newConfigId;
+        Scenario scenario = new Scenario();
+        scenario.setTitle("");
+        scenario.setShortDescription("");
+        scenario.setPrompt("");
+        scenario = scenarioRepository.save(scenario);
+        return scenario.getConfigId();
     }
 
-    // Save scenario prompt (title, shortDescription, prompt)
+    // Save scenario details (title, shortDescription, prompt)
     public void saveScenario(int configId, Scenario scenario) {
-        scenarios.put(configId, scenario);
+        scenario.setConfigId(configId);
+        scenarioRepository.save(scenario);
     }
 
-    // Retrieve scenario prompt by configId
+    // Retrieve a scenario by configId
     public Optional<Scenario> getScenarioById(int configId) {
-        return Optional.ofNullable(scenarios.get(configId));
+        return scenarioRepository.findById(configId);
     }
 
-    // Save scenario summary (basic info for overview)
+    // Get all scenario summaries (configId and title)
     public List<ScenarioSummary> getAllScenarioSummaries() {
+        List<Scenario> scenarios = scenarioRepository.findAll();
         List<ScenarioSummary> summaries = new ArrayList<>();
-        for (Scenario scenario : scenarios.values()) {
+        for (Scenario scenario : scenarios) {
             summaries.add(new ScenarioSummary(scenario.getConfigId(), scenario.getTitle()));
         }
         return summaries;
     }
 
-    // Delete a scenario by configId
+    // Delete scenario (including associated generated scenarios and marking schemas)
+    @Transactional
     public boolean deleteScenario(int configId) {
-        return scenarios.remove(configId) != null && generatedScenarios.remove(configId) != null;
+        Optional<Scenario> scenarioOpt = scenarioRepository.findById(configId);
+        if (scenarioOpt.isEmpty()) return false;
+
+        Scenario scenario = scenarioOpt.get();
+        generatedScenarioRepository.deleteAll(generatedScenarioRepository.findByScenario(scenario));
+        markingSchemaRepository.deleteAll(markingSchemaRepository.findByScenario(scenario));
+        scenarioRepository.delete(scenario);
+        return true;
     }
 
     // Generate scenario using OpenAI
-    public GeneratedScenarioDto generateScenario(int configId) throws Exception {
-        Scenario scenario = scenarios.get(configId);
-        if (scenario == null) {
-            throw new NoSuchElementException("Scenario with configId " + configId + " not found.");
-        }
+    public GeneratedScenario generateScenario(int configId) throws Exception {
+        Scenario scenario = scenarioRepository.findById(configId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
 
-        // Prepare input for getGeneratedResponse
+        // Prepare input for OpenAI request
         List<Map<String, Object>> messages = List.of(
             Map.of("role", "system", "content", "You are assisting in generating a mock patient scenario."),
-            Map.of("role", "user", "content", String.format("Title: %s\nShort Description: %s\nPrompt: %s", 
+            Map.of("role", "user", "content", String.format("Title: %s\nShort Description: %s\nPrompt: %s",
                     scenario.getTitle(), scenario.getShortDescription(), scenario.getPrompt()))
         );
 
         JsonNode generatedResponse = openAiClient.getGeneratedResponse(messages);
 
-        // Extracting relevant fields
-        JsonNode generatedScenarioNode = generatedResponse.get("generatedScenario").get(0);  // Assuming only one scenario is returned
+        // Extract relevant fields
+        JsonNode generatedScenarioNode = generatedResponse.get("generatedScenario").get(0);
 
-        GeneratedScenarioDto generatedScenario = new GeneratedScenarioDto(
+        GeneratedScenario generatedScenario = new GeneratedScenario(
+            0, // Auto-generated ID
+            scenario,
             generatedScenarioNode.get("taskInstructions").asText(),
-            generatedScenarioNode.get("backgroundInfo").asText(),
+            generatedScenarioNode.get("backgroundInformation").asText(),
             generatedScenarioNode.get("personalityTraits").asText(),
             generatedScenarioNode.get("questionsForDoctor").asText(),
             generatedScenarioNode.get("responseGuidelines").asText(),
             generatedScenarioNode.get("sampleResponses").asText()
         );
 
-        // Save generated scenario
-        generatedScenarios.put(configId, generatedScenario);
-        return generatedScenario;
+        return generatedScenarioRepository.save(generatedScenario);
     }
 
-    // Save the generated scenario (to be expanded later for DB integration)
-    public void saveGeneratedScenario(int configId, GeneratedScenarioDto generatedScenario) {
-        generatedScenarios.put(configId, generatedScenario);
+    // Save generated scenario to database
+    public void saveGeneratedScenario(int configId, GeneratedScenario generatedScenario) {
+        Scenario scenario = scenarioRepository.findById(configId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
+        generatedScenario.setScenario(scenario);
+        generatedScenarioRepository.save(generatedScenario);
     }
 
-    // Retrieve the saved generated scenario
-    public Optional<GeneratedScenarioDto> getGeneratedScenario(int configId) {
-        return Optional.ofNullable(generatedScenarios.get(configId));
+    // Retrieve saved generated scenario
+    public Optional<GeneratedScenario> getGeneratedScenario(int configId) {
+        return generatedScenarioRepository.findByScenario(
+                scenarioRepository.findById(configId).orElse(null)).stream().findFirst();
     }
 
-    // Generate rubric schema
-    public MarkingSchemaDto generateMarkingSchema(int configId, String schemaTitle) throws Exception {
-        Scenario scenario = scenarios.get(configId);
-        if (scenario == null) {
-            throw new NoSuchElementException("Scenario with configId " + configId + " not found.");
-        }
+    // Generate a rubric schema
+    public MarkingSchema generateMarkingSchema(int configId, String schemaTitle) throws Exception {
+        Scenario scenario = scenarioRepository.findById(configId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
 
-        // Prepare input for getGeneratedRubrics
         List<Map<String, Object>> messages = List.of(
             Map.of("role", "system", "content", "You are assisting in generating a marking rubric schema."),
-            Map.of("role", "user", "content", String.format("Scenario Title: %s\nShort Description: %s\nPrompt: %s\nTask Instructions: %s\nRubric Title: %s",
+            Map.of("role", "user", "content", String.format(
+                    "Scenario Title: %s\nShort Description: %s\nPrompt: %s\nTask Instructions: %s\nRubric Title: %s",
                     scenario.getTitle(), scenario.getShortDescription(), scenario.getPrompt(),
-                    generatedScenarios.get(configId).getTaskInstruction(), schemaTitle))
+                    getGeneratedScenario(configId).orElseThrow().getTaskInstruction(), schemaTitle))
         );
 
         JsonNode generatedResponse = rubricsOpenAiClient.getGeneratedRubrics(messages);
-        JsonNode rubricNode = generatedResponse.get("generatedRubrics").get(0); 
+        JsonNode rubricNode = generatedResponse.get("generatedRubrics").get(0);
 
-        // Assign a schemaId
-        int schemaId = markingSchemas.getOrDefault(configId, new ArrayList<>()).size() + 1;
-
-        MarkingSchemaDto rubricSchema = new MarkingSchemaDto(
-            schemaId,
+        MarkingSchema markingSchema = new MarkingSchema(
+            0, // Auto-generated ID
+            scenario,
             rubricNode.get("title").asText(),
             rubricNode.get("unsatisfactory").asText(),
             rubricNode.get("borderline").asText(),
             rubricNode.get("satisfactory").asText()
         );
 
-        markingSchemas.computeIfAbsent(configId, k -> new ArrayList<>()).add(rubricSchema);
-        return rubricSchema;
+        return markingSchemaRepository.save(markingSchema);
     }
 
-    // Save a marking schema
-    public void saveMarkingSchema(int configId, MarkingSchemaDto markingSchema) {
-        markingSchemas.computeIfAbsent(configId, k -> new ArrayList<>()).add(markingSchema);
+    // Save a rubric schema
+    public void saveMarkingSchema(int configId, MarkingSchema markingSchema) {
+        Scenario scenario = scenarioRepository.findById(configId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
+        markingSchema.setScenario(scenario);
+        markingSchemaRepository.save(markingSchema);
     }
 
-    // Retrieve all marking schemas for a scenario
-    public List<MarkingSchemaDto> getMarkingSchemas(int configId) {
-        return markingSchemas.getOrDefault(configId, Collections.emptyList());
+    // Retrieve all rubric schemas for a scenario
+    public List<MarkingSchema> getMarkingSchemas(int configId) {
+        return markingSchemaRepository.findByScenario(
+                scenarioRepository.findById(configId).orElse(null));
     }
 
-    // Delete a specific marking schema
+    // Delete a rubric schema
     public boolean deleteMarkingSchema(int configId, int schemaId) {
-        return markingSchemas.getOrDefault(configId, new ArrayList<>())
-                .removeIf(schema -> schema.getSchemaId() == schemaId);
+        Optional<MarkingSchema> markingSchemaOpt = markingSchemaRepository.findById(schemaId);
+        if (markingSchemaOpt.isEmpty()) return false;
+
+        markingSchemaRepository.delete(markingSchemaOpt.get());
+        return true;
     }
 }

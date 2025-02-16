@@ -4,14 +4,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
-import com.communication.communication_backend.dtos.GeneratedScenarioDto;
-import com.communication.communication_backend.dtos.MarkingSchemaDto;
+import com.communication.communication_backend.dtos.GeneratedScenario;
+import com.communication.communication_backend.dtos.MarkingSchema;
 import com.communication.communication_backend.dtos.Scenario;
 import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.communication.communication_backend.service.creatingScenarios.ScenariosOpenAiClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/config")
@@ -23,7 +24,7 @@ public class ScenarioController {
         this.scenarioService = scenarioService;
     }
 
-    // Initialize a new configId and create an empty scenario (optional endpoint if needed)
+    // Initialize a new scenario with an auto-generated configId
     @PostMapping("/initialize")
     public ResponseEntity<Integer> initializeScenario() {
         int configId = scenarioService.initializeConfigId();
@@ -61,21 +62,17 @@ public class ScenarioController {
     }
 
     // Delete a scenario by configId
-    @DeleteMapping
-    public ResponseEntity<String> deleteScenario(@RequestParam int configId) {
+    @DeleteMapping("/{configId}")
+    public ResponseEntity<String> deleteScenario(@PathVariable int configId) {
         boolean isDeleted = scenarioService.deleteScenario(configId);
-        if (isDeleted) {
-            return ResponseEntity.ok("Scenario with configId " + configId + " deleted successfully.");
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        return isDeleted ? ResponseEntity.ok("Scenario deleted successfully.") : ResponseEntity.notFound().build();
     }
 
     // Generate scenario via AI based on existing title, description, and prompt
     @GetMapping("/{configId}/scenario/generate")
-    public ResponseEntity<GeneratedScenarioDto> generateScenario(@PathVariable int configId) {
+    public ResponseEntity<GeneratedScenario> generateScenario(@PathVariable int configId) {
         try {
-            GeneratedScenarioDto generatedScenario = scenarioService.generateScenario(configId);
+            GeneratedScenario generatedScenario = scenarioService.generateScenario(configId);
             return ResponseEntity.ok(generatedScenario);
         } catch (Exception e) {
             e.printStackTrace(); // Log error for debugging
@@ -85,7 +82,7 @@ public class ScenarioController {
 
     // Save the generated scenario (AI-generated)
     @PostMapping("/{configId}/scenario")
-    public ResponseEntity<String> saveGeneratedScenario(@PathVariable int configId, @RequestBody GeneratedScenarioDto generatedScenario) {
+    public ResponseEntity<String> saveGeneratedScenario(@PathVariable int configId, @RequestBody GeneratedScenario generatedScenario) {
         try {
             scenarioService.saveGeneratedScenario(configId, generatedScenario);
             return ResponseEntity.ok("Generated scenario saved successfully for configId: " + configId);
@@ -97,10 +94,10 @@ public class ScenarioController {
 
     // Retrieve saved generated scenario
     @GetMapping("/{configId}/scenario")
-    public ResponseEntity<GeneratedScenarioDto> getGeneratedScenario(@PathVariable int configId) {
+    public ResponseEntity<GeneratedScenario> getGeneratedScenario(@PathVariable int configId) {
         try {
-            return scenarioService.getGeneratedScenario(configId)
-                    .map(ResponseEntity::ok)
+            Optional<GeneratedScenario> generatedScenario = scenarioService.getGeneratedScenario(configId);
+            return generatedScenario.map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
             e.printStackTrace(); // Log error for debugging
@@ -110,9 +107,9 @@ public class ScenarioController {
 
     // Generate a new marking schema
     @GetMapping("/{configId}/marking-schema/generate")
-    public ResponseEntity<MarkingSchemaDto> generateMarkingSchema(@PathVariable int configId, @RequestParam String title) {
+    public ResponseEntity<MarkingSchema> generateMarkingSchema(@PathVariable int configId, @RequestParam String title) {
         try {
-            MarkingSchemaDto markingSchema = scenarioService.generateMarkingSchema(configId, title);
+            MarkingSchema markingSchema = scenarioService.generateMarkingSchema(configId, title);
             return ResponseEntity.ok(markingSchema);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
@@ -121,15 +118,25 @@ public class ScenarioController {
 
     // Save a marking schema
     @PostMapping("/{configId}/marking-schema")
-    public ResponseEntity<String> saveMarkingSchema(@PathVariable int configId, @RequestBody MarkingSchemaDto markingSchema) {
-        scenarioService.saveMarkingSchema(configId, markingSchema);
-        return ResponseEntity.ok("Marking schema saved successfully.");
+    public ResponseEntity<String> saveMarkingSchema(@PathVariable int configId, @RequestBody MarkingSchema markingSchema) {
+        try {
+            scenarioService.saveMarkingSchema(configId, markingSchema);
+            return ResponseEntity.ok("Marking schema saved successfully.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Failed to save marking schema.");
+        }
     }
 
     // Retrieve all marking schemas for a scenario
     @GetMapping("/{configId}/marking-schema")
-    public ResponseEntity<List<MarkingSchemaDto>> getMarkingSchemas(@PathVariable int configId) {
-        return ResponseEntity.ok(scenarioService.getMarkingSchemas(configId));
+    public ResponseEntity<List<MarkingSchema>> getMarkingSchemas(@PathVariable int configId) {
+        try {
+            return ResponseEntity.ok(scenarioService.getMarkingSchemas(configId));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
+        }
     }
 
     // Delete a marking schema
