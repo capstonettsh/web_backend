@@ -49,7 +49,7 @@ public class ScenarioController {
     // Add a scenario summary to the global list (for the overview page)
     @PostMapping
     public ResponseEntity<String> saveScenarioSummary(@RequestBody ScenarioSummary summary) {
-        Scenario scenario = new Scenario(summary.getConfigId(), summary.getTitle(), "", "");
+        Scenario scenario = new Scenario(summary.getConfigId(), summary.getTitle(), "", "", summary.getUserId());
         scenarioService.saveScenario(summary.getConfigId(), scenario);
         return ResponseEntity.ok("Scenario summary saved successfully.");
     }

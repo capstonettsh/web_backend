@@ -22,4 +22,7 @@ public class Scenario {
 
     @Column(nullable = true, length = 2000)
     private String prompt;
+
+    @Column(nullable = false)
+    private String userId;  // New field to store the user who created or last edited the scenario
 }

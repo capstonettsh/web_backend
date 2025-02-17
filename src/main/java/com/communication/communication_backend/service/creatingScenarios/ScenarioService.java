@@ -35,14 +35,22 @@ public class ScenarioService {
         scenario.setTitle("");
         scenario.setShortDescription("");
         scenario.setPrompt("");
+        scenario.setUserId(""); // Initialize userId as empty
         scenario = scenarioRepository.save(scenario);
         return scenario.getConfigId();
     }
 
-    // Save scenario details (title, shortDescription, prompt)
+    // Save scenario details (title, shortDescription, prompt, userId)
     public void saveScenario(int configId, Scenario scenario) {
-        scenario.setConfigId(configId);
-        scenarioRepository.save(scenario);
+        Scenario existingScenario = scenarioRepository.findById(configId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
+
+        existingScenario.setTitle(scenario.getTitle());
+        existingScenario.setShortDescription(scenario.getShortDescription());
+        existingScenario.setPrompt(scenario.getPrompt());
+        existingScenario.setUserId(scenario.getUserId()); // Assign the userId
+
+        scenarioRepository.save(existingScenario);
     }
 
     // Retrieve a scenario by configId
@@ -50,12 +58,12 @@ public class ScenarioService {
         return scenarioRepository.findById(configId);
     }
 
-    // Get all scenario summaries (configId and title)
+    // Get all scenario summaries (configId, title, userId)
     public List<ScenarioSummary> getAllScenarioSummaries() {
         List<Scenario> scenarios = scenarioRepository.findAll();
         List<ScenarioSummary> summaries = new ArrayList<>();
         for (Scenario scenario : scenarios) {
-            summaries.add(new ScenarioSummary(scenario.getConfigId(), scenario.getTitle()));
+            summaries.add(new ScenarioSummary(scenario.getConfigId(), scenario.getTitle(), scenario.getUserId()));
         }
         return summaries;
     }
