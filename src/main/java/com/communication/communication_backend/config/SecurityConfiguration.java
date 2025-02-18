@@ -18,14 +18,14 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable());
-//                .authorizeHttpRequests(authorizeRequests -> authorizeRequests
-//                        .requestMatchers("/auth/**").permitAll()
-//                        .anyRequest().authenticated())
-//                .oauth2ResourceServer(oauth2 -> oauth2
-//                        .bearerTokenResolver(customBearerTokenResolver()) // Use custom resolver
-//                        .jwt(Customizer.withDefaults()) // Use default JWT decoding
-//                );
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests
+                        .requestMatchers("/auth/**").permitAll()
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenResolver(customBearerTokenResolver()) // Use custom resolver
+                        .jwt(Customizer.withDefaults()) // Use default JWT decoding
+                );
         return http.build();
     }
 
