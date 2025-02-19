@@ -2,6 +2,9 @@ package com.communication.communication_backend.service.creatingScenarios;
 
 import org.springframework.stereotype.Service;
 import com.communication.communication_backend.dtos.*;
+import com.communication.communication_backend.entity.GeneratedScenario;
+import com.communication.communication_backend.entity.MarkingSchema;
+import com.communication.communication_backend.entity.Scenario;
 import com.communication.communication_backend.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.transaction.Transactional;
