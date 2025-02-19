@@ -1,4 +1,4 @@
-package com.communication.communication_backend.dtos;
+package com.communication.communication_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

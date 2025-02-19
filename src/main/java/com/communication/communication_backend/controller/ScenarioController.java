@@ -4,10 +4,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
-import com.communication.communication_backend.dtos.GeneratedScenario;
-import com.communication.communication_backend.dtos.MarkingSchema;
-import com.communication.communication_backend.dtos.Scenario;
 import com.communication.communication_backend.dtos.ScenarioSummary;
+import com.communication.communication_backend.entity.GeneratedScenario;
+import com.communication.communication_backend.entity.MarkingSchema;
+import com.communication.communication_backend.entity.Scenario;
 import com.communication.communication_backend.service.creatingScenarios.ScenariosOpenAiClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -33,7 +33,7 @@ public class ScenarioController {
 
     // Save the scenario details (title, shortDescription, prompt)
     @PostMapping("/{configId}/scenario-prompt")
-    public ResponseEntity<String> saveScenario(@PathVariable int configId, @RequestBody Scenario scenario) {
+    public ResponseEntity<String> saveScenario(@PathVariable("configId") int configId, @RequestBody Scenario scenario) {
         scenarioService.saveScenario(configId, scenario);
         return ResponseEntity.ok("Scenario saved successfully with configId: " + configId);
     }
@@ -46,13 +46,13 @@ public class ScenarioController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Add a scenario summary to the global list (for the overview page)
-    @PostMapping
-    public ResponseEntity<String> saveScenarioSummary(@RequestBody ScenarioSummary summary) {
-        Scenario scenario = new Scenario(summary.getConfigId(), summary.getTitle(), "", "", summary.getUserId());
-        scenarioService.saveScenario(summary.getConfigId(), scenario);
-        return ResponseEntity.ok("Scenario summary saved successfully.");
-    }
+    // // Add a scenario summary to the global list (for the overview page)
+    // @PostMapping
+    // public ResponseEntity<String> saveScenarioSummary(@RequestBody ScenarioSummary summary) {
+    //     Scenario scenario = new Scenario(summary.getConfigId(), summary.getTitle(), "", "", summary.getUserId());
+    //     scenarioService.saveScenario(summary.getConfigId(), scenario);
+    //     return ResponseEntity.ok("Scenario summary saved successfully.");
+    // }
 
     // Retrieve all scenario summaries
     @GetMapping
