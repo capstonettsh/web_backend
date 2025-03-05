@@ -8,11 +8,11 @@ import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.communication.communication_backend.entity.GeneratedScenario;
 import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
-import com.communication.communication_backend.service.creatingScenarios.ScenariosOpenAiClient;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collections;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/config")
@@ -26,9 +26,9 @@ public class ScenarioController {
 
     // Initialize a new scenario with an auto-generated configId
     @PostMapping("/initialize")
-    public ResponseEntity<Integer> initializeScenario() {
+    public ResponseEntity<Map<String, Integer>> initializeScenario() {
         int configId = scenarioService.initializeConfigId();
-        return ResponseEntity.ok(configId);
+        return ResponseEntity.ok(Collections.singletonMap("configId", configId));
     }
 
     // Save the scenario details (title, shortDescription, prompt)
@@ -70,7 +70,7 @@ public class ScenarioController {
 
     // Generate scenario via AI based on existing title, description, and prompt
     @GetMapping("/{configId}/scenario/generate")
-    public ResponseEntity<GeneratedScenario> generateScenario(@PathVariable int configId) {
+    public ResponseEntity<GeneratedScenario> generateScenario(@PathVariable("configId") int configId) {
         try {
             GeneratedScenario generatedScenario = scenarioService.generateScenario(configId);
             return ResponseEntity.ok(generatedScenario);
@@ -94,7 +94,7 @@ public class ScenarioController {
 
     // Retrieve saved generated scenario
     @GetMapping("/{configId}/scenario")
-    public ResponseEntity<GeneratedScenario> getGeneratedScenario(@PathVariable int configId) {
+    public ResponseEntity<GeneratedScenario> getGeneratedScenario(@PathVariable("configId") int configId) {
         try {
             Optional<GeneratedScenario> generatedScenario = scenarioService.getGeneratedScenario(configId);
             return generatedScenario.map(ResponseEntity::ok)
@@ -107,7 +107,8 @@ public class ScenarioController {
 
     // Generate a new marking schema
     @GetMapping("/{configId}/marking-schema/generate")
-    public ResponseEntity<MarkingSchema> generateMarkingSchema(@PathVariable int configId, @RequestParam String title) {
+    public ResponseEntity<MarkingSchema> generateMarkingSchema(@PathVariable("configId") int configId,
+                                                               @RequestParam("title") String title) {
         try {
             MarkingSchema markingSchema = scenarioService.generateMarkingSchema(configId, title);
             return ResponseEntity.ok(markingSchema);
@@ -118,7 +119,7 @@ public class ScenarioController {
 
     // Save a marking schema
     @PostMapping("/{configId}/marking-schema")
-    public ResponseEntity<String> saveMarkingSchema(@PathVariable int configId, @RequestBody MarkingSchema markingSchema) {
+    public ResponseEntity<String> saveMarkingSchema(@PathVariable("configId") int configId, @RequestBody MarkingSchema markingSchema) {
         try {
             scenarioService.saveMarkingSchema(configId, markingSchema);
             return ResponseEntity.ok("Marking schema saved successfully.");
@@ -141,7 +142,7 @@ public class ScenarioController {
 
     // Delete a marking schema
     @DeleteMapping("/{configId}/marking-schema/{schemaId}")
-    public ResponseEntity<String> deleteMarkingSchema(@PathVariable int configId, @PathVariable int schemaId) {
+    public ResponseEntity<String> deleteMarkingSchema(@PathVariable("configId") int configId, @PathVariable int schemaId) {
         boolean deleted = scenarioService.deleteMarkingSchema(configId, schemaId);
         return deleted ? ResponseEntity.ok("Marking schema deleted.") : ResponseEntity.notFound().build();
     }
