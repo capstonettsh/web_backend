@@ -1,6 +1,5 @@
 package com.communication.communication_backend.entity;
 
-import com.communication.communication_backend.entity.Scenario;
 import jakarta.persistence.*;
 import lombok.*;
 

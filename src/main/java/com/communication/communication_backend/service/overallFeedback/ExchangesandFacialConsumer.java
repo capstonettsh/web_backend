@@ -1,4 +1,4 @@
-package com.communication.communication_backend.service.toneAnalysis;
+package com.communication.communication_backend.service.overallFeedback;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,15 +10,21 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
+import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
+import com.communication.communication_backend.service.toneAnalysis.FinalOpenAiClient;
+import com.communication.communication_backend.service.toneAnalysis.OpenAiClient;
+import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
 
 import java.util.*;
 
-public class ExchangesConsumer {
+public class ExchangesandFacialConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
+    private final FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName;
     private final ConsumerFactory<String, String> consumerFactory;
     private final KafkaMessageListenerContainer<String, String> container;
+    private final GptResponseConsumer gptResponseConsumer;
     @Autowired
     private OpenAiClient openAiClient;
 
@@ -26,17 +32,26 @@ public class ExchangesConsumer {
     private FinalOpenAiClient finalOpenAiClient;
 
     private final Queue<JsonNode> jsonNodeQueue = new LinkedList<>();
+    private List<JsonNode> facialEmotionData = new ArrayList<>(); // To store facial emotion data for the whole session
 
-    public ExchangesConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+    public ExchangesandFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+                             FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
                              KafkaTemplate<String, String> kafkaTemplate,
-                             ConsumerFactory<String, String> consumerFactory) {
+                             ConsumerFactory<String, String> consumerFactory,
+                             GptResponseConsumer gptResponseConsumer) {
         this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
+        this.facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicName;
         this.kafkaTemplate = kafkaTemplate;
         this.consumerFactory = consumerFactory;
         this.container = createContainer();
         this.container.start();
+        this.gptResponseConsumer = gptResponseConsumer;
+
+        // Start listening to facial emotion data topic as well
+        listenToFacialEmotionData();
     }
 
+    // Creating container to consume tone analysis responses
     private KafkaMessageListenerContainer<String, String> createContainer() {
         ContainerProperties containerProperties = new ContainerProperties(toneAnalysisKafkaTopicName.getHumeSpeechExchange());
         containerProperties.setMessageListener(new MessageListener<String, String>() {
@@ -49,32 +64,46 @@ public class ExchangesConsumer {
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 
+    // Consuming message and processing it
     public void consume(String exchangeJson) {
         try {
-            JsonNode exchangeNode1 = objectMapper.readTree(exchangeJson);
-            jsonNodeQueue.add(exchangeNode1);
-
-            // exchangeJson is a JSON representation of the user-assistant exchange
-            System.out.println("Received exchange for ChatGPT processing: " + exchangeJson);
-
-            // Get empathy rating from ChatGPT
-            String rating = openAiClient.getEmpathyRating(exchangeJson);
-            System.out.println("check chat gpt response" + rating);
-
-            // Append rating to the exchange JSON
             JsonNode exchangeNode = objectMapper.readTree(exchangeJson);
-            // Convert to ObjectNode to add a field
-            ObjectNode node = (ObjectNode) exchangeNode;
-            node.put("rating", rating);
+            int userBeginTime = exchangeNode.get("userBeginTime").asInt();
+            int userEndTime = exchangeNode.get("userEndTime").asInt();
 
-            String updatedExchange = objectMapper.writeValueAsString(node);
-            System.out.println("check updated exchange " + updatedExchange);
+            // Get facial emotion data for this exchange from the gptResponseConsumer
+            List<JsonNode> facialEmotionDataForExchange = gptResponseConsumer.getFacialEmotionDataForExchange(facialEmotionData, userBeginTime, userEndTime);
 
-            // Send updated exchange to GPT responses topic
-            kafkaTemplate.send(toneAnalysisKafkaTopicName.getHumeSpeechGptResponse(), updatedExchange);
+            // Aggregate the facial emotion data for the exchange
+            JsonNode aggregatedFacialEmotionData = gptResponseConsumer.aggregateFacialEmotionData(facialEmotionDataForExchange);
 
+            // Send the combined data to _combined topic
+            gptResponseConsumer.sendCombinedData(exchangeNode, aggregatedFacialEmotionData);
         } catch (Exception e) {
-            System.err.println("Error processing exchange with ChatGPT: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // Listen to facial emotion data from the topic
+    private void listenToFacialEmotionData() {
+        ContainerProperties containerProperties = new ContainerProperties(facialAnalysisKafkaTopicName.getHumeFaceGPTResponse());
+        containerProperties.setMessageListener(new MessageListener<String, String>() {
+            @Override
+            public void onMessage(ConsumerRecord<String, String> record) {
+                consumeFacialEmotionData(record.value());
+            }
+        });
+        containerProperties.setGroupId("facial-emotion-data-group");
+        KafkaMessageListenerContainer<String, String> facialEmotionContainer = new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
+        facialEmotionContainer.start();
+    }
+
+    // Store facial emotion data from the topic
+    private void consumeFacialEmotionData(String facialEmotionDataJson) {
+        try {
+            JsonNode facialEmotionNode = objectMapper.readTree(facialEmotionDataJson);
+            facialEmotionData.add(facialEmotionNode); // Add to the list of all facial emotion data
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

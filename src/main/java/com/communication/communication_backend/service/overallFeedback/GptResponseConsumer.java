@@ -14,13 +14,13 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
 public class GptResponseConsumer {
-    private static final long BUFFER_TIME_THRESHOLD = 60000; // e.g., 60 seconds
-    private static final int FACIAL_INTERVAL = 300; // 300 ms
+
+    private static final int FACIAL_INTERVAL = 600;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
     private final FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName;
@@ -30,9 +30,14 @@ public class GptResponseConsumer {
     private final KafkaMessageListenerContainer<String, String> speechContainer;
     private final KafkaMessageListenerContainer<String, String> facialContainer;
     private final Queue<JsonNode> speechMessagesQueue = new LinkedList<>();
-    private final Queue<JsonNode> faceMessagesQueue = new LinkedList<>();
+    private List<JsonNode> facialEmotionData; // Add a list to hold facial emotion data
 
-    public GptResponseConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName, FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName, OverallFeedbackKafkaTopicName overallFeedbackKafkaTopicName, KafkaTemplate<String, String> kafkaTemplate, ConsumerFactory<String, String> consumerFactory) {
+    @Autowired
+    public GptResponseConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+                               FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
+                               OverallFeedbackKafkaTopicName overallFeedbackKafkaTopicName,
+                               KafkaTemplate<String, String> kafkaTemplate,
+                               ConsumerFactory<String, String> consumerFactory) {
         this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
         this.facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicName;
         this.overallFeedbackKafkaTopicName = overallFeedbackKafkaTopicName;
@@ -40,9 +45,8 @@ public class GptResponseConsumer {
         this.consumerFactory = consumerFactory;
 
         this.speechContainer = createSpeechContainer();
-        this.speechContainer.start();
-
         this.facialContainer = createFacialContainer();
+        this.speechContainer.start();
         this.facialContainer.start();
     }
 
@@ -64,14 +68,12 @@ public class GptResponseConsumer {
         ContainerProperties containerProperties = new ContainerProperties(
                 facialAnalysisKafkaTopicName.getHumeFaceGPTResponse()
         );
-
         containerProperties.setMessageListener(new MessageListener<String, String>() {
             @Override
             public void onMessage(ConsumerRecord<String, String> record) {
                 consumeFace(record.value());
             }
         });
-//        containerProperties.setMessageListener((MessageListener<String, String>) this::consumeFace);
         containerProperties.setGroupId("gpt-facial-response-group");
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
@@ -79,8 +81,6 @@ public class GptResponseConsumer {
     public void consumeSpeech(String record) {
         try {
             JsonNode jsonNode = objectMapper.readTree(record);
-
-            Thread.sleep(5000); // wait for facial analysis data
             processSpeechMessage(jsonNode);
         } catch (Exception e) {
             e.printStackTrace();
@@ -90,112 +90,95 @@ public class GptResponseConsumer {
     public void consumeFace(String record) {
         try {
             JsonNode jsonNode = objectMapper.readTree(record);
-
-            processFaceMessage(jsonNode);
+            facialEmotionData.add(jsonNode); // Store the facial emotion data
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void processSpeechMessage(JsonNode jsonNode) throws JsonProcessingException {
-        // Validate and extract necessary fields
+    private void processSpeechMessage(JsonNode jsonNode) throws Exception {
+        // Extract necessary fields
         if (!jsonNode.has("userBeginTime") || !jsonNode.has("userEndTime")) {
             return;
         }
 
         int newUserBeginTime = jsonNode.get("userBeginTime").asInt();
-//        int newUserEndTime = jsonNode.get("userEndTime").asInt();
 
         if (speechMessagesQueue.peek() != null) {
             JsonNode oldNode = speechMessagesQueue.peek();
             int oldUserBeginTime = oldNode.get("userBeginTime").asInt();
 //            int oldUserEndTime = oldNode.get("userEndTime").asInt();
+            // Get the facial emotion data for the exchange
+            List<JsonNode> matchingFacialData = getFacialEmotionDataForExchange(facialEmotionData, oldUserBeginTime, newUserBeginTime);
+            JsonNode aggregatedFacialEmotionData = aggregateFacialEmotionData(matchingFacialData);
 
-            addFacialDataAndPush(oldUserBeginTime, newUserBeginTime);
+            // Send combined data to _combined topic
+            sendCombinedData(jsonNode, aggregatedFacialEmotionData);
         }
 
         speechMessagesQueue.add(jsonNode);
     }
 
-    private void processFaceMessage(JsonNode jsonNode) {
-        faceMessagesQueue.add(jsonNode);
-    }
-
-    private void addFacialDataAndPush(int oldUserBeginTime, int newUserBeginTime) throws JsonProcessingException {
-        // add new speech message and all the relevant facial analysis data into the json node
-        ObjectMapper objectMapperCombined = new ObjectMapper();
+    // Method to get facial emotion data for a specific exchange
+    public List<JsonNode> getFacialEmotionDataForExchange(List<JsonNode> facialEmotionData, int oldUserBeginTime, int newUserBeginTime) {
+        List<JsonNode> matchingFacialData = new ArrayList<>();
         JsonNode speechNode = speechMessagesQueue.remove();
 
-        ObjectNode speechObjectNode = (ObjectNode) speechNode;
-
-        // Create an ArrayNode to hold the `anotherJsonNode`
-        ArrayNode facialAnalysisArray = JsonNodeFactory.instance.arrayNode();
-
-        while (true) {
-            if (faceMessagesQueue.peek() == null) {
-                // todo push the data
-//                ObjectNode facialAnalysisObject = JsonNodeFactory.instance.objectNode();
-//                facialAnalysisObject.set("facialAnalysis", facialAnalysisArray);
-                speechObjectNode.set("facialAnalysis", facialAnalysisArray);
-                kafkaTemplate.send(overallFeedbackKafkaTopicName.getCombined(), objectMapperCombined.writeValueAsString(speechObjectNode));
-                break;
-            }
-
-            // if it's within range
-            if (faceMessagesQueue.peek().get("startTime").asInt() + FACIAL_INTERVAL / 2 >= oldUserBeginTime &&
-                    faceMessagesQueue.peek().get("startTime").asInt() <= newUserBeginTime
-            ) {
-                // append this facial message
-                facialAnalysisArray.add(faceMessagesQueue.remove());
-            } else if (faceMessagesQueue.peek().get("startTime").asInt() + FACIAL_INTERVAL / 2 <= oldUserBeginTime) {
-                faceMessagesQueue.remove(); // remove unused node
-            } else {
-                // face analysis is out of range, proceed to push the data to kafka
-                // todo push the data
-//                ObjectNode facialAnalysisObject = JsonNodeFactory.instance.objectNode();
-//                facialAnalysisObject.set("facialAnalysis", facialAnalysisArray);
-
-                // Append the new structure to speechObjectNode
-                speechObjectNode.set("facialAnalysis", facialAnalysisArray);
-                kafkaTemplate.send(overallFeedbackKafkaTopicName.getCombined(), objectMapperCombined.writeValueAsString(speechObjectNode));
-                break;
+        for (JsonNode facialEmotion : facialEmotionData) {
+            int startTime = facialEmotion.get("startTime").asInt();
+            if (startTime + FACIAL_INTERVAL/2 >= oldUserBeginTime && startTime <= newUserBeginTime) {
+                matchingFacialData.add(facialEmotion);
             }
         }
+
+        return matchingFacialData;
     }
 
-    public void endChat() {
-        try {
-            // Check if there is a speech message to process
-            if (speechMessagesQueue.isEmpty()) {
-                System.out.println("No speech messages to process.");
-                return;
+    // Method to aggregate facial emotion data
+    public JsonNode aggregateFacialEmotionData(List<JsonNode> facialEmotionData) {
+        Map<String, Float> emotionScores = new HashMap<>();
+        Map<String, Integer> emotionCounts = new HashMap<>();
+
+        for (JsonNode facialEmotion : facialEmotionData) {
+            JsonNode emotions = facialEmotion.get("emotions");
+            for (Iterator<Map.Entry<String, JsonNode>> it = emotions.fields(); it.hasNext(); ) {
+                Map.Entry<String, JsonNode> entry = it.next();
+                String emotion = entry.getKey();
+                float score = entry.getValue().floatValue();
+
+                emotionScores.put(emotion, emotionScores.getOrDefault(emotion, 0f) + score);
+                emotionCounts.put(emotion, emotionCounts.getOrDefault(emotion, 0) + 1);
             }
-            Thread.sleep(5000); // wait for facial analysis data
-
-            // Remove the last speech message from the queue
-            JsonNode speechNode = speechMessagesQueue.remove();
-            ObjectNode speechObjectNode = (ObjectNode) speechNode;
-
-            // Create an ArrayNode to hold the facial analysis data
-            ArrayNode facialAnalysisArray = JsonNodeFactory.instance.arrayNode();
-
-            // Add all remaining facial messages to the facialAnalysisArray
-            while (!faceMessagesQueue.isEmpty()) {
-                facialAnalysisArray.add(faceMessagesQueue.remove());
-            }
-
-            // Create an object to hold the facial analysis data
-            ObjectNode facialAnalysisObject = JsonNodeFactory.instance.objectNode();
-            facialAnalysisObject.set("facialAnalysis", facialAnalysisArray);
-
-            // Append the facial analysis data to the speech message
-            speechObjectNode.set("facialAnalysis", facialAnalysisObject);
-
-            // Send the combined data to the Kafka topic
-            kafkaTemplate.send(overallFeedbackKafkaTopicName.getCombined(), objectMapper.writeValueAsString(speechObjectNode));
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+
+        for (Map.Entry<String, Float> entry : emotionScores.entrySet()) {
+            String emotion = entry.getKey();
+            emotionScores.put(emotion, entry.getValue() / emotionCounts.get(emotion));
+        }
+
+        List<Map.Entry<String, Float>> sortedEmotions = new ArrayList<>(emotionScores.entrySet());
+        sortedEmotions.sort((a, b) -> Float.compare(b.getValue(), a.getValue()));
+
+        Map<String, Float> top3Emotions = new HashMap<>();
+        for (int i = 0; i < 3 && i < sortedEmotions.size(); i++) {
+            top3Emotions.put(sortedEmotions.get(i).getKey(), sortedEmotions.get(i).getValue());
+        }
+
+        ObjectNode aggregatedFacialEmotion = objectMapper.createObjectNode();
+        aggregatedFacialEmotion.set("emotions", objectMapper.valueToTree(top3Emotions));
+
+        return aggregatedFacialEmotion;
     }
 
+    // Send the combined data to _combined topic
+    public void sendCombinedData(JsonNode speechData, JsonNode facialEmotionData) {
+        ObjectNode combinedData = objectMapper.createObjectNode();
+        combinedData.set("userMessage", speechData.get("userMessage"));
+        combinedData.set("assistantMessage", speechData.get("assistantMessage"));
+        combinedData.set("userStartTime", speechData.get("userBeginTime"));
+        combinedData.set("userEndTime", speechData.get("userEndTime"));
+        combinedData.set("facialEmotion", facialEmotionData);
+
+        kafkaTemplate.send(overallFeedbackKafkaTopicName.getCombined(), combinedData.toString());
+    }
 }

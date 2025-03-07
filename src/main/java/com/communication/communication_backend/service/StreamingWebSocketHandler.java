@@ -9,6 +9,7 @@ import com.communication.communication_backend.service.overallFeedback.GptRespon
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackExchangesConsumer;
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicName;
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicNameFactory;
+import com.communication.communication_backend.service.overallFeedback.ExchangesandFacialConsumer;
 import com.communication.communication_backend.service.toneAnalysis.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,7 +72,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
     private GptResponseConsumer gptResponseConsumer;
     private OverallFeedbackExchangesConsumer overallFeedbackExchangesConsumer;
-    private ExchangesConsumer exchangesConsumer;
+    private ExchangesandFacialConsumer exchangesandfacialConsumer;
     @Autowired
     private ApplicationContext context;
 
@@ -205,7 +206,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
         context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
         shortenedConsumer = context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
-        this.exchangesConsumer = context.getBean(ExchangesConsumer.class, toneAnalysisKafkaTopicName);
+        this.exchangesandfacialConsumer = context.getBean(ExchangesandFacialConsumer.class, toneAnalysisKafkaTopicName);
 
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
 //        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
@@ -313,7 +314,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                         throw new RuntimeException(e);
                     }
                 })
-                .thenRun(() -> this.overallFeedback = exchangesConsumer.endChat())
+                .thenRun(() -> this.overallFeedback = exchangesandfacialConsumer.endChat())
                 .join();
 
         long currentTime = System.currentTimeMillis();

@@ -8,8 +8,6 @@ import com.communication.communication_backend.entity.GeneratedScenario;
 import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
 import com.communication.communication_backend.dtos.ScenarioSummary;
-import com.communication.communication_backend.service.creatingScenarios.ScenariosOpenAiClient;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.Collections;
 import java.util.List;
