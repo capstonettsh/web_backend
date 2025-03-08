@@ -2,9 +2,10 @@ package com.communication.communication_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import net.minidev.json.annotate.JsonIgnore;
 
 @Entity
-@Table(name = "scenarios")
+@Table(name = "scenario")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -12,19 +13,46 @@ public class Scenario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-increments the ID
-    private int configId;
+    private int scenarioId;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String title;
 
     @Lob
-    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
     private String shortDescription;
 
     @Lob
     @Column(nullable = true, columnDefinition = "LONGTEXT")
     private String prompt;
 
-    @Column(nullable = false)
+    @Lob
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    private String taskInstruction;
+
+    @Lob
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    private String backgroundInformation;
+
+    @Lob
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    private String personality;
+
+    @Lob
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    private String questionsForDoctor;
+
+    @Lob
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    private String responseGuidelines;
+
+    @Lob
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
+    private String sampleResponses;
+
+    @Column(nullable = true)
     private String userId;  // New field to store the user who created or last edited the scenario
+
+    @Column(nullable = true)
+    private String agentId;
 }

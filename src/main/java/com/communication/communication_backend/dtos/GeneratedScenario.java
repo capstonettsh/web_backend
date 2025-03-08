@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ScenarioSummary {
+public class GeneratedScenario {
     private int scenarioId;
     private String title;
     private String userId; // New field to track who created/edited the scenario

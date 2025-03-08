@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "marking_schemas")
+@Table(name = "marking_schema")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -13,10 +13,10 @@ public class MarkingSchema {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int schemaId;
+    private int markingSchemaId;
 
     @ManyToOne
-    @JoinColumn(name = "config_id", nullable = false)
+    @JoinColumn(name = "scenario_id", nullable = false)
     private Scenario scenario;  // Link to Scenario entity
 
     @Lob
@@ -24,14 +24,14 @@ public class MarkingSchema {
     private String title;
 
     @Lob
-    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
     private String unsatisfactory;
 
     @Lob
-    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
     private String borderline;
 
     @Lob
-    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
     private String satisfactory;
 }
