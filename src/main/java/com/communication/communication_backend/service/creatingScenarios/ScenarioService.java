@@ -127,23 +127,6 @@ public class ScenarioService {
         return scenarioRepository.save(scenario);
     }
 
-    // Save generated scenario to database
-//    public void saveGeneratedScenario(int configId, GeneratedScenario generatedScenario) {
-//        Scenario scenario = scenarioRepository.findById(configId)
-//                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
-//        generatedScenario.setScenario(scenario);
-//        generatedScenarioRepository.save(generatedScenario);
-//    }
-
-    // Retrieve saved generated scenario
-//    public Optional<GeneratedScenario> getGeneratedScenario(int configId) {
-//        Scenario scenario = scenarioRepository.findById(configId).orElse(null);
-//        if (scenario == null) {
-//            return Optional.empty();
-//        }
-//        return generatedScenarioRepository.findFirstByScenarioOrderByIdDesc(scenario);
-//    }
-
     // Generate a rubric schema
     public MarkingSchema generateMarkingSchema(int configId, String schemaTitle) throws Exception {
         Scenario scenario = scenarioRepository.findById(configId)
