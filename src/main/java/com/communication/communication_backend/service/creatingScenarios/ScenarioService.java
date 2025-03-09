@@ -2,12 +2,21 @@ package com.communication.communication_backend.service.creatingScenarios;
 
 import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.communication.communication_backend.dtos.*;
 import com.communication.communication_backend.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.transaction.Transactional;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.*;
 
 @Service
@@ -17,6 +26,11 @@ public class ScenarioService {
     private final RubricsOpenAiClient rubricsOpenAiClient;
     private final ScenarioRepository scenarioRepository;
     private final MarkingSchemaRepository markingSchemaRepository;
+
+    @Value("${elevenlabs.api.key}")
+    private String elevenlabsApiKey;
+    private static final String CREATE_AGENT_URL = "https://api.elevenlabs.io/v1/convai/agents/create";
+    private static final String UPDATE_AGENT_URL = "https://api.elevenlabs.io/v1/convai/agents/";
 
     public ScenarioService(
             ScenariosOpenAiClient openAiClient,
@@ -57,7 +71,127 @@ public class ScenarioService {
         existingScenario.setPrompt(scenario.getPrompt());
         existingScenario.setUserId(scenario.getUserId()); // Assign the userId
 
+        if (existingScenario.getAgentId() != null && !existingScenario.getAgentId().isEmpty()) {
+            // Agent exists → update it via PATCH
+            updateAgent(existingScenario.getAgentId(), scenario);
+        } else {
+            // No agent exists → create a new one and save its agentId
+            String newAgentId = createAgent(scenario);
+            existingScenario.setAgentId(newAgentId);
+        }
+
         scenarioRepository.save(existingScenario);
+    }
+
+    private String createAgent(Scenario scenario) {
+        // Build the conversation config payload to match the curl command.
+        Map<String, Object> conversationConfig = new HashMap<>();
+
+        // Set up the "agent" configuration with a prompt.
+        Map<String, Object> agentConfig = new HashMap<>();
+        Map<String, Object> promptConfig = new HashMap<>();
+        promptConfig.put("prompt", scenario.getTitle() + scenario.getShortDescription());
+        agentConfig.put("prompt", promptConfig);
+        conversationConfig.put("agent", agentConfig);
+
+        // Set up the TTS configuration.
+        Map<String, Object> ttsConfig = new HashMap<>();
+        ttsConfig.put("voice_id", "aSXZu6bgEOS8MXVRzjPi");
+        conversationConfig.put("tts", ttsConfig);
+
+        // Create the overall request payload.
+        Map<String, Object> requestBodyMap = new HashMap<>();
+        requestBodyMap.put("conversation_config", conversationConfig);
+
+        // Serialize the request payload to JSON.
+        ObjectMapper objectMapper = new ObjectMapper();
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(requestBodyMap);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to convert request body to JSON", e);
+        }
+
+        // Build the HttpRequest.
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.elevenlabs.io/v1/convai/agents/create"))
+                .header("xi-api-key", elevenlabsApiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        // Send the request using HttpClient.
+        HttpClient client = HttpClient.newHttpClient();
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            int statusCode = response.statusCode();
+            if (statusCode >= 200 && statusCode < 300) {
+                // Assuming the response JSON contains {"agent_id": "new_agent_id"}
+                Map<String, Object> responseMap = objectMapper.readValue(response.body(), Map.class);
+                if (responseMap != null && responseMap.containsKey("agent_id")) {
+                    return (String) responseMap.get("agent_id");
+                } else {
+                    throw new RuntimeException("agent_id not found in response");
+                }
+            } else {
+                throw new RuntimeException("Failed to create agent. HTTP status code: " + statusCode);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("HTTP request failed", e);
+        }
+    }
+
+    private void updateAgent(String agentId, Scenario scenario) {
+        String url = UPDATE_AGENT_URL + agentId;
+
+        // Build an updated conversation config payload.
+        Map<String, Object> conversationConfig = new HashMap<>();
+        Map<String, Object> agentConfig = new HashMap<>();
+        Map<String, Object> promptConfig = new HashMap<>();
+        promptConfig.put("prompt", scenario.getTitle() + scenario.getShortDescription() +
+                scenario.getBackgroundInformation() + scenario.getPersonality() + scenario.getQuestionsForDoctor() +
+                scenario.getResponseGuidelines() + scenario.getSampleResponses() + "Generate the sentence with a lot " +
+                "of punctuation marks to represent the emotion.");
+        agentConfig.put("prompt", promptConfig);
+        conversationConfig.put("agent", agentConfig);
+//        Map<String, Object> ttsConfig = new HashMap<>();
+        // For simplicity, we’re reusing the same voice id.
+//        ttsConfig.put("voice_id", DEFAULT_VOICE_ID);
+//        conversationConfig.put("tts", ttsConfig);
+        // You can update other configurations based on scenario details if needed.
+
+        Map<String, Object> requestBodyMap = new HashMap<>();
+        requestBodyMap.put("conversation_config", conversationConfig);
+
+        // Convert the request body map to a JSON string using Jackson
+        ObjectMapper objectMapper = new ObjectMapper();
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(requestBodyMap);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to convert request body to JSON", e);
+        }
+
+        // Build the HttpRequest using PATCH method.
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("xi-api-key", elevenlabsApiKey)
+                .header("Content-Type", "application/json")
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        // Create an HttpClient instance and send the request.
+        HttpClient client = HttpClient.newHttpClient();
+        try {
+            // We can use BodyHandlers.discarding() since no response body is expected.
+            HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+            int statusCode = response.statusCode();
+            if (statusCode < 200 || statusCode >= 300) {
+                throw new RuntimeException("Failed to update agent on ElevenLabs. HTTP status code: " + statusCode);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("HTTP request failed", e);
+        }
     }
 
     public void saveScenarioDetails(int scenarioId, Scenario scenarioData) {
@@ -69,6 +203,15 @@ public class ScenarioService {
         scenario.setQuestionsForDoctor(scenarioData.getQuestionsForDoctor());
         scenario.setResponseGuidelines(scenarioData.getResponseGuidelines());
         scenario.setSampleResponses(scenarioData.getSampleResponses());
+
+        if (scenario.getAgentId() != null && !scenario.getAgentId().isEmpty()) {
+            // Agent exists → update it via PATCH
+            updateAgent(scenario.getAgentId(), scenario);
+        } else {
+            // No agent exists → create a new one and save its agentId
+            String newAgentId = createAgent(scenario);
+            scenario.setAgentId(newAgentId);
+        }
         scenarioRepository.save(scenario);
     }
 
