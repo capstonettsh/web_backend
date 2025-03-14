@@ -12,7 +12,7 @@ public class MarkingSchema {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int schemaId;
+    private int markingSchemaId;
 
     @ManyToOne
     @JoinColumn(name = "config_id", nullable = false)

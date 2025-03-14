@@ -16,37 +16,44 @@ public class ScenarioService {
     private final ScenariosOpenAiClient openAiClient;
     private final RubricsOpenAiClient rubricsOpenAiClient;
     private final ScenarioRepository scenarioRepository;
-    private final GeneratedScenarioRepository generatedScenarioRepository;
+    // private final GeneratedScenarioRepository generatedScenarioRepository;
     private final MarkingSchemaRepository markingSchemaRepository;
 
     public ScenarioService(
             ScenariosOpenAiClient openAiClient,
             RubricsOpenAiClient rubricsOpenAiClient,
             ScenarioRepository scenarioRepository,
-            GeneratedScenarioRepository generatedScenarioRepository,
+            // GeneratedScenarioRepository generatedScenarioRepository,
             MarkingSchemaRepository markingSchemaRepository) {
         this.openAiClient = openAiClient;
         this.rubricsOpenAiClient = rubricsOpenAiClient;
         this.scenarioRepository = scenarioRepository;
-        this.generatedScenarioRepository = generatedScenarioRepository;
+        // this.generatedScenarioRepository = generatedScenarioRepository;
         this.markingSchemaRepository = markingSchemaRepository;
     }
 
-    // Initialize a new scenario with an auto-generated configId
-    public int initializeConfigId() {
+    // Create a new Scenario with empty/default values and return its configId
+    public int initializeScenarioId() {
         Scenario scenario = new Scenario();
         scenario.setTitle("");
         scenario.setShortDescription("");
         scenario.setPrompt("");
-        scenario.setUserId(""); // Initialize userId as empty
+        scenario.setTaskInstruction("");
+        scenario.setBackgroundInformation("");
+        scenario.setPersonality("");
+        scenario.setQuestionsForDoctor("");
+        scenario.setResponseGuidelines("");
+        scenario.setSampleResponses("");
+        scenario.setUserId("");
         scenario = scenarioRepository.save(scenario);
-        return scenario.getConfigId();
+        return scenario.getScenarioId();
     }
 
     // Save scenario details (title, shortDescription, prompt, userId)
-    public void saveScenario(int configId, Scenario scenario) {
-        Scenario existingScenario = scenarioRepository.findById(configId)
-                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
+    public void saveBasicScenario(int scenarioId, Scenario scenario) {
+        Scenario existingScenario = scenarioRepository.findById(scenarioId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with scenarioId " + scenarioId + " not found" +
+                        "."));
 
         existingScenario.setTitle(scenario.getTitle());
         existingScenario.setShortDescription(scenario.getShortDescription());
@@ -54,6 +61,18 @@ public class ScenarioService {
         existingScenario.setUserId(scenario.getUserId()); // Assign the userId
 
         scenarioRepository.save(existingScenario);
+    }
+
+    public void saveScenarioDetails(int scenarioId, Scenario scenarioData) {
+        Scenario scenario = scenarioRepository.findById(scenarioId)
+                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + scenarioId + " not found."));
+        scenario.setTaskInstruction(scenarioData.getTaskInstruction());
+        scenario.setBackgroundInformation(scenarioData.getBackgroundInformation());
+        scenario.setPersonality(scenarioData.getPersonality());
+        scenario.setQuestionsForDoctor(scenarioData.getQuestionsForDoctor());
+        scenario.setResponseGuidelines(scenarioData.getResponseGuidelines());
+        scenario.setSampleResponses(scenarioData.getSampleResponses());
+        scenarioRepository.save(scenario);
     }
 
     // Retrieve a scenario by configId
@@ -66,7 +85,7 @@ public class ScenarioService {
         List<Scenario> scenarios = scenarioRepository.findAll();
         List<ScenarioSummary> summaries = new ArrayList<>();
         for (Scenario scenario : scenarios) {
-            summaries.add(new ScenarioSummary(scenario.getConfigId(), scenario.getTitle(), scenario.getUserId(), scenario.getShortDescription()));
+            summaries.add(new ScenarioSummary(scenario.getScenarioId(), scenario.getTitle(), scenario.getUserId(), scenario.getShortDescription()));
         }
         return summaries;
     }
@@ -78,14 +97,13 @@ public class ScenarioService {
         if (scenarioOpt.isEmpty()) return false;
 
         Scenario scenario = scenarioOpt.get();
-        generatedScenarioRepository.deleteAll(generatedScenarioRepository.findByScenario(scenario));
         markingSchemaRepository.deleteAll(markingSchemaRepository.findByScenario(scenario));
         scenarioRepository.delete(scenario);
         return true;
     }
 
     // Generate scenario using OpenAI
-    public GeneratedScenario generateScenario(int configId) throws Exception {
+    public Scenario generateScenario(int configId) throws Exception {
         Scenario scenario = scenarioRepository.findById(configId)
                 .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
 
@@ -101,36 +119,32 @@ public class ScenarioService {
         // Extract relevant fields
         JsonNode generatedScenarioNode = generatedResponse.get("generatedScenario").get(0);
 
-        GeneratedScenario generatedScenario = new GeneratedScenario(
-                0, // Auto-generated ID
-                scenario,
-                generatedScenarioNode.get("taskInstructions").asText(),
-                generatedScenarioNode.get("backgroundInfo").asText(),
-                generatedScenarioNode.get("personalityTraits").asText(),
-                generatedScenarioNode.get("questionsForDoctor").asText(),
-                generatedScenarioNode.get("responseGuidelines").asText(),
-                generatedScenarioNode.get("sampleResponses").asText()
-        );
+        scenario.setTaskInstruction(generatedScenarioNode.get("taskInstructions").asText());
+        scenario.setBackgroundInformation(generatedScenarioNode.get("backgroundInfo").asText());
+        scenario.setPersonality(generatedScenarioNode.get("personalityTraits").asText());
+        scenario.setQuestionsForDoctor(generatedScenarioNode.get("questionsForDoctor").asText());
+        scenario.setResponseGuidelines(generatedScenarioNode.get("responseGuidelines").asText());
+        scenario.setSampleResponses(generatedScenarioNode.get("sampleResponses").asText());
 
-        return generatedScenarioRepository.save(generatedScenario);
+        return scenarioRepository.save(scenario);
     }
 
     // Save generated scenario to database
-    public void saveGeneratedScenario(int configId, GeneratedScenario generatedScenario) {
-        Scenario scenario = scenarioRepository.findById(configId)
-                .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
-        generatedScenario.setScenario(scenario);
-        generatedScenarioRepository.save(generatedScenario);
-    }
+    // public void saveGeneratedScenario(int configId, GeneratedScenario generatedScenario) {
+    //     Scenario scenario = scenarioRepository.findById(configId)
+    //             .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
+    //     generatedScenario.setScenario(scenario);
+    //     generatedScenarioRepository.save(generatedScenario);
+    // }
 
     // Retrieve saved generated scenario
-    public Optional<GeneratedScenario> getGeneratedScenario(int configId) {
-        Scenario scenario = scenarioRepository.findById(configId).orElse(null);
-        if (scenario == null) {
-            return Optional.empty();
-        }
-        return generatedScenarioRepository.findFirstByScenarioOrderByIdDesc(scenario);
-    }
+    // public Optional<GeneratedScenario> getGeneratedScenario(int configId) {
+    //     Scenario scenario = scenarioRepository.findById(configId).orElse(null);
+    //     if (scenario == null) {
+    //         return Optional.empty();
+    //     }
+    //     return generatedScenarioRepository.findFirstByScenarioOrderByIdDesc(scenario);
+    // }
 
     // Generate a rubric schema
     public MarkingSchema generateMarkingSchema(int configId, String schemaTitle) throws Exception {
@@ -142,7 +156,7 @@ public class ScenarioService {
                 Map.of("role", "user", "content", String.format(
                         "Scenario Title: %s\nShort Description: %s\nPrompt: %s\nTask Instructions: %s\nRubric Title: %s",
                         scenario.getTitle(), scenario.getShortDescription(), scenario.getPrompt(),
-                        getGeneratedScenario(configId).orElseThrow().getTaskInstruction(), schemaTitle))
+                        scenario.getTaskInstruction() + scenario.getBackgroundInformation() + scenario.getPersonality(), schemaTitle))
         );
 
         JsonNode generatedResponse = rubricsOpenAiClient.getGeneratedRubrics(messages);

@@ -73,25 +73,6 @@ public class ScenariosOpenAiClient {
                                         "type", "string",
                                         "description", "Sample responses that the mock patient could give to the medical student. It should be in a form of a JSON with the keys being certain keywords such as 'symptoms' and 'concerns' and the values being the one-to-two-lines response relevant to that keyword."
                                 )
-                                // "Rubrics", Map.of(
-                                //         "type", "array",
-                                //         "description", "This is the rubric that the medical student will be assessed against.",
-                                //         "items", Map.of(
-                                //                 "type", "object",
-                                //                 "properties", Map.of(
-                                //                         "rubricCriteria1", Map.of(
-                                //                                 "type", "string",
-                                //                                 "description", "The rubric criteria."
-                                //                         ),
-                                //                         "rubricLevels", Map.of(
-                                //                                 "type", "integer",
-                                //                                 "description", "The score for the rubric."
-                                //                         )
-                                //                 ),
-                                //                 "required", List.of("rubricText", "rubricScore"),
-                                //                 "additionalProperties", false
-                                //         )
-                                // )
                         ),
                         "required", List.of("taskInstructions", "backgroundInfo", "personalityTraits", "questionsForDoctor", "responseGuidelines", "sampleResponses"),
                         "additionalProperties", false
