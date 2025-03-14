@@ -18,15 +18,15 @@ public class MarkingSchema {
     @JoinColumn(name = "config_id", nullable = false)
     private Scenario scenario;  // Link to Scenario entity
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String title;
 
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String unsatisfactory;
 
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String borderline;
 
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String satisfactory;
 }

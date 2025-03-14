@@ -72,7 +72,7 @@ public class RubricsOpenAiClient {
         ));
 
         schema.put("properties", properties);
-        schema.put("required", List.of("Scenario"));
+        schema.put("required", List.of("generatedRubrics"));
         schema.put("additionalProperties", false);
 
         jsonSchema.put("schema", schema);

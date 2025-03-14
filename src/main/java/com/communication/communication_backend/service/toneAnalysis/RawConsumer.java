@@ -2,7 +2,6 @@ package com.communication.communication_backend.service.toneAnalysis;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -54,29 +53,41 @@ public class RawConsumer {
 //            System.out.println(jsonNode);
 
             String type = jsonNode.has("type") ? jsonNode.get("type").asText() : "";
-            if (!type.equals("assistant_message") && !type.equals("user_message")) {
+            if (!type.equalsIgnoreCase("agent_message") && !type.equalsIgnoreCase("user_message")) {
                 // We only process messages that have a user or assistant role
                 // Adjust conditions as per your real schema
                 return;
             }
 
-            JsonNode messageNode = jsonNode.get("message");
-            if (messageNode == null) return;
+//            JsonNode messageNode = jsonNode.get("message");
+//            if (messageNode == null) return;
+            if (jsonNode == null) return;
 
-            String role = messageNode.has("role") ? messageNode.get("role").asText() : null;
-            String content = messageNode.has("content") ? messageNode.get("content").asText() : null;
+            String role = jsonNode.has("role") ? jsonNode.get("role").asText().toLowerCase() : null;
+            String content = jsonNode.has("message_text") ? jsonNode.get("message_text").asText() : null;
             if (role == null || content == null) return;
 
             // Extract scores (tone data)
-            JsonNode scoresNode = jsonNode.at("/models/prosody/scores");
+            JsonNode scoresNode = jsonNode.has("emotion_features") ? jsonNode.get("emotion_features") : null;
             Map<String, Double> emotionMap = new HashMap<>();
-            if (scoresNode != null && scoresNode.isObject()) {
-                Iterator<Map.Entry<String, JsonNode>> fields = scoresNode.fields();
-                while (fields.hasNext()) {
-                    Map.Entry<String, JsonNode> entry = fields.next();
-                    emotionMap.put(entry.getKey(), entry.getValue().asDouble());
+
+            if (scoresNode != null) {
+                if (scoresNode.isTextual()) {
+                    // Parse the JSON string into a JsonNode
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    scoresNode = objectMapper.readTree(scoresNode.asText());
+                }
+
+                if (scoresNode.isObject()) {
+                    // Iterate through the fields and populate the map
+                    Iterator<Map.Entry<String, JsonNode>> fields = scoresNode.fields();
+                    while (fields.hasNext()) {
+                        Map.Entry<String, JsonNode> entry = fields.next();
+                        emotionMap.put(entry.getKey(), entry.getValue().asDouble());
+                    }
                 }
             }
+
 
             // Get top 3 emotions
             LinkedHashMap<String, String> top3 = emotionMap.entrySet().stream()
@@ -91,9 +102,41 @@ public class RawConsumer {
             Map<String, Object> shortened = new HashMap<>();
 
             // put start time if type is user_message
-            if (type.equals("user_message")) {
-                shortened.put("userBeginTime", jsonNode.get("time").get("begin").asText());
-                shortened.put("userEndTime", jsonNode.get("time").get("end").asText());
+            if (type.equalsIgnoreCase("user_message")) {
+                JsonNode metadata = jsonNode.has("metadata") ? jsonNode.get("metadata") : null;
+
+                if (metadata != null && metadata.isTextual()) {
+                    // Parse the metadata string into a JsonNode
+                    ObjectMapper objectMapperMetadata = new ObjectMapper();
+                    metadata = objectMapperMetadata.readTree(metadata.asText());
+                }
+
+                System.out.println(metadata);
+
+                if (metadata != null && metadata.has("segments")) {
+                    System.out.println(metadata.get("segments"));
+                    JsonNode segments = metadata.get("segments");
+
+                    if (segments.isArray() && segments.size() > 0) {
+                        JsonNode segment0 = segments.get(0);
+                        JsonNode time = segment0.has("time") ? segment0.get("time") : null;
+
+                        if (time != null) {
+                            String begin = time.has("begin_ms") ? time.get("begin_ms").asText() : null;
+                            String end = time.has("end_ms") ? time.get("end_ms").asText() : null;
+
+                            if (begin != null && end != null) {
+                                shortened.put("userBeginTime", begin);
+                                shortened.put("userEndTime", end);
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            if (role.equals("agent")) {
+                role = "assistant";
             }
 
             shortened.put("role", role);

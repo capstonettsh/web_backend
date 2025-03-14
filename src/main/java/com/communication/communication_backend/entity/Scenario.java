@@ -17,10 +17,10 @@ public class Scenario {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false, length = 1000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String shortDescription;
 
-    @Column(nullable = true, length = 2000)
+    @Column(nullable = true, columnDefinition = "LONGTEXT")
     private String prompt;
 
     @Column(nullable = false)

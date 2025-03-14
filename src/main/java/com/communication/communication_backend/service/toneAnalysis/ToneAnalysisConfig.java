@@ -42,4 +42,10 @@ public class ToneAnalysisConfig {
                                                GptResponseConsumer gptResponseConsumer) {
         return new ExchangesandFacialConsumer(toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory, gptResponseConsumer);
     }
+
+    @Bean
+    @Scope("prototype")
+    public HumeAiChatReader humeAiChatReader(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
+        return new HumeAiChatReader(kafkaTemplate, toneAnalysisKafkaTopicName);
+    }
 }

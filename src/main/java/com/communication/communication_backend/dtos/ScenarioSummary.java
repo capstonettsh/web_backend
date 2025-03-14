@@ -11,4 +11,5 @@ public class ScenarioSummary {
     private int configId;
     private String title;
     private String userId; // New field to track who created/edited the scenario
+    private String shortDescription;
 }

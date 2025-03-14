@@ -99,7 +99,7 @@ public class ScenariosOpenAiClient {
         ));
 
         schema.put("properties", properties);
-        schema.put("required", List.of("Scenario"));
+        schema.put("required", List.of("generatedScenario"));
         schema.put("additionalProperties", false);
 
         jsonSchema.put("schema", schema);
@@ -137,19 +137,22 @@ public class ScenariosOpenAiClient {
             if (choices != null && choices.isArray() && choices.size() > 0) {
                 JsonNode firstChoice = choices.get(0);
                 JsonNode message = firstChoice.get("message");
-                if (message != null && message.has("content")) {
-                    String contentJson = message.get("content").asText();
-                    // Parse the content JSON to JsonNode
-                    JsonNode contentNode = objectMapper.readTree(contentJson);
-                    return contentNode;
+                if (message != null) {
+                        JsonNode contentNode = message.get("content");
+                        if (contentNode != null && !contentNode.isNull()) {
+                            String contentJson = contentNode.asText();
+                            // Parse the content JSON to JsonNode
+                            JsonNode contentParsed = objectMapper.readTree(contentJson);
+                            return contentParsed;
+                        } else {
+                            throw new RuntimeException("Missing 'content' in the message.");
+                        }
+                    }
                 }
+                // Handle if choices are empty or message is missing
+                throw new RuntimeException("No valid message found in the response.");
+            } else {
+                throw new RuntimeException("Error: " + response.statusCode() + " - " + response.body());
             }
-        } else {
-            // Handle error responses
-            throw new RuntimeException("Error: " + response.statusCode() + " - " + response.body());
-        }
-
-        // Return null if no valid response is found
-        return null;
-    }    
+        }    
 }

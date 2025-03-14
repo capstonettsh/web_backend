@@ -43,5 +43,10 @@
     "name": "ServicePointManager.DefaultConnectionLimit",
     "type": "java.lang.String",
     "description": "A description for 'ServicePointManager.DefaultConnectionLimit'"
+  },
+  {
+    "name": "humeai.secret.key",
+    "type": "java.lang.String",
+    "description": "A description for 'humeai.secret.key'"
   }
 ]}

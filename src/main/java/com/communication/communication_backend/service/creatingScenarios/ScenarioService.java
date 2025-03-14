@@ -66,7 +66,7 @@ public class ScenarioService {
         List<Scenario> scenarios = scenarioRepository.findAll();
         List<ScenarioSummary> summaries = new ArrayList<>();
         for (Scenario scenario : scenarios) {
-            summaries.add(new ScenarioSummary(scenario.getConfigId(), scenario.getTitle(), scenario.getUserId()));
+            summaries.add(new ScenarioSummary(scenario.getConfigId(), scenario.getTitle(), scenario.getUserId(), scenario.getShortDescription()));
         }
         return summaries;
     }
@@ -125,8 +125,11 @@ public class ScenarioService {
 
     // Retrieve saved generated scenario
     public Optional<GeneratedScenario> getGeneratedScenario(int configId) {
-        return generatedScenarioRepository.findByScenario(
-                scenarioRepository.findById(configId).orElse(null)).stream().findFirst();
+        Scenario scenario = scenarioRepository.findById(configId).orElse(null);
+        if (scenario == null) {
+            return Optional.empty();
+        }
+        return generatedScenarioRepository.findFirstByScenarioOrderByIdDesc(scenario);
     }
 
     // Generate a rubric schema

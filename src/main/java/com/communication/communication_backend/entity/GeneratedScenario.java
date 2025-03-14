@@ -18,21 +18,21 @@ public class GeneratedScenario {
     @JoinColumn(name = "config_id", nullable = false)
     private Scenario scenario;  // Link to Scenario entity
 
-    @Column(nullable = false, length = 5000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String taskInstruction;
 
-    @Column(nullable = false, length = 5000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String backgroundInformation;
 
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String personality;
 
-    @Column(nullable = false, length = 5000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String questionsForDoctor;
 
-    @Column(nullable = false, length = 5000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String responseGuidelines;
 
-    @Column(nullable = false, length = 5000)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String sampleResponses;
 }
