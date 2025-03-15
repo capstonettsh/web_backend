@@ -1,18 +1,15 @@
 package com.communication.communication_backend.controller;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
-import com.communication.communication_backend.entity.GeneratedScenario;
+import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
-import com.communication.communication_backend.dtos.ScenarioSummary;
+import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/config")
@@ -34,7 +31,7 @@ public class ScenarioController {
     // Save Part 1: Basic scenario details (title, shortDescription, prompt, userId)
     @PostMapping("/{configId}/scenario-prompt")
     public ResponseEntity<Map<String, String>> saveBasicScenario(@PathVariable("configId") int configId,
-                                                            @RequestBody Scenario scenario) {
+                                                                 @RequestBody Scenario scenario) {
         scenarioService.saveBasicScenario(configId, scenario);
         return ResponseEntity.ok(Collections.singletonMap("message", "success"));
     }
@@ -70,7 +67,6 @@ public class ScenarioController {
 //        scenarioService.saveScenario(summary.getConfigId(), scenario);
 //        return ResponseEntity.ok("Scenario summary saved successfully.");
 //    }
-
 
 
     // Retrieve all scenario summaries

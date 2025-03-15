@@ -1,13 +1,14 @@
 package com.communication.communication_backend.service.creatingScenarios;
 
-import com.communication.communication_backend.entity.GeneratedScenario;
+import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
-import org.springframework.stereotype.Service;
-import com.communication.communication_backend.dtos.*;
-import com.communication.communication_backend.repository.*;
+import com.communication.communication_backend.repository.MarkingSchemaRepository;
+import com.communication.communication_backend.repository.ScenarioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
+
 import java.util.*;
 
 @Service
