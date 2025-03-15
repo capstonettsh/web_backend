@@ -89,10 +89,10 @@ public class ScenarioController {
 
     // Generate scenario via AI based on existing title, description, and prompt
     @GetMapping("/{configId}/scenario/generate")
-    public ResponseEntity<GeneratedScenario> generateScenario(@PathVariable("configId") int configId) {
+    public ResponseEntity<Scenario> generateScenario(@PathVariable("configId") int configId) {
         try {
-            GeneratedScenario generatedScenario = scenarioService.generateScenario(configId);
-            return ResponseEntity.ok(generatedScenario);
+            Scenario updatedScenario = scenarioService.generateScenario(configId);
+            return ResponseEntity.ok(updatedScenario);
         } catch (Exception e) {
             e.printStackTrace(); // Log error for debugging
             return ResponseEntity.status(500).body(null);
