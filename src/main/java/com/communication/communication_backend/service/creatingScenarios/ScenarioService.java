@@ -329,12 +329,22 @@ public class ScenarioService {
     }
 
     // Save a rubric schema
-    public void saveMarkingSchema(int configId, MarkingSchema markingSchema) {
+    public void saveMarkingSchema(int configId, List<MarkingSchema> markingSchemas) {
+        // Retrieve the Scenario by configId
         Scenario scenario = scenarioRepository.findById(configId)
                 .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + configId + " not found."));
-        markingSchema.setScenario(scenario);
-        markingSchemaRepository.save(markingSchema);
+
+        // Delete all existing marking schemas for this scenario
+        List<MarkingSchema> existingSchemas = markingSchemaRepository.findByScenario(scenario);
+        if (!existingSchemas.isEmpty()) {
+            markingSchemaRepository.deleteAll(existingSchemas);
+        }
+
+        // Set the scenario for each new marking schema and save them all
+        markingSchemas.forEach(schema -> schema.setScenario(scenario));
+        markingSchemaRepository.saveAll(markingSchemas);
     }
+
 
     // Retrieve all rubric schemas for a scenario
     public List<MarkingSchema> getMarkingSchemas(int configId) {

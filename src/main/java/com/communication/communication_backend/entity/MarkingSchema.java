@@ -15,7 +15,7 @@ public class MarkingSchema {
     private int markingSchemaId;
 
     @ManyToOne
-    @JoinColumn(name = "config_id", nullable = false)
+    @JoinColumn(name = "scenario_id", nullable = false)
     private Scenario scenario;  // Link to Scenario entity
 
     @Lob

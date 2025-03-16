@@ -7,7 +7,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicName;
-import com.communication.communication_backend.service.overallFeedback.ExchangesandFacialConsumer;
+import com.communication.communication_backend.service.overallFeedback.ExchangeSendFacialConsumer;
 import com.communication.communication_backend.service.overallFeedback.GptResponseConsumer;
 
 @Configuration
@@ -35,12 +35,10 @@ public class ToneAnalysisConfig {
 
     @Bean
     @Scope("prototype")
-    public ExchangesandFacialConsumer exchangesConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
-                                               FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName, // Add this argument
-                                               KafkaTemplate<String, String> kafkaTemplate,
-                                               ConsumerFactory<String, String> consumerFactory,
-                                               GptResponseConsumer gptResponseConsumer) {
-        return new ExchangesandFacialConsumer(toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory, gptResponseConsumer);
+    public ExchangeSendFacialConsumer exchangeSendFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+                                                                 FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
+                                                                 GptResponseConsumer gptResponseConsumer) {
+        return new ExchangeSendFacialConsumer(toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory, gptResponseConsumer);
     }
 
     @Bean

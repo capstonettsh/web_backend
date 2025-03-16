@@ -71,7 +71,9 @@ public class ScenariosOpenAiClient {
                                 ),
                                 "sampleResponses", Map.of(
                                         "type", "string",
-                                        "description", "Sample responses that the mock patient could give to the medical student. It should be in a form of a JSON with the keys being certain keywords such as 'symptoms' and 'concerns' and the values being the one-to-two-lines response relevant to that keyword."
+                                        "description", "Sample responses that the mock patient could give to the " +
+                                                "medical student. It should with certain keywords such as 'symptoms' " +
+                                                "and 'concerns' and the values being the one-to-two-lines response relevant to that keyword."
                                 )
                         ),
                         "required", List.of("taskInstructions", "backgroundInfo", "personalityTraits", "questionsForDoctor", "responseGuidelines", "sampleResponses"),

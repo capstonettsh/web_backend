@@ -1,7 +1,12 @@
 package com.communication.communication_backend.service.toneAnalysis;
 
+import com.communication.communication_backend.entity.MarkingSchema;
+import com.communication.communication_backend.entity.Scenario;
+import com.communication.communication_backend.repository.MarkingSchemaRepository;
+import com.communication.communication_backend.repository.ScenarioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,19 +30,39 @@ public class FinalOpenAiClient {
     @Value("${chatgpt.api.key}")
     private String apiKey;
 
+    @Autowired
+    private MarkingSchemaRepository markingSchemaRepository;
+
+    @Autowired
+    private ScenarioRepository scenarioRepository;
+
     public FinalOpenAiClient() {
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper();
     }
 
-    /**
-     * Sends the collected chat messages to OpenAI's API and retrieves the overall feedback.
-     *
-     * @param messages List of messages containing role and content.
-     * @return JsonNode representing the mistake summary.
-     * @throws Exception if there's an error during the API call.
-     */
-    public JsonNode getOverallFeedback(List<Map<String, Object>> messages) throws Exception {
+    private String buildMarkingRubricDescription(String scenarioId) throws Exception {
+        int scenarioIdInt = Integer.parseInt(scenarioId);
+        // Fetch the scenario by ID
+        Scenario scenario = scenarioRepository.findById(scenarioIdInt)
+                .orElseThrow(() -> new Exception("Scenario not found for id: " + scenarioId));
+        // Get the marking schemas for the scenario
+        List<MarkingSchema> markingSchemas = markingSchemaRepository.findByScenario(scenario);
+
+        StringBuilder rubricBuilder = new StringBuilder();
+        for (MarkingSchema schema : markingSchemas) {
+            // Assume your MarkingSchema entity has fields like category, description, and gradingCriteria
+            rubricBuilder.append("Category: ").append(schema.getTitle()).append("\n");
+            rubricBuilder.append("Description: ").append("Unsatisfactory: " + schema.getUnsatisfactory() + "\n" + "Borderline:" + schema.getBorderline() + "\n" + "Satisfactory:" + schema.getSatisfactory()).append(
+                    "\n");
+        }
+        return rubricBuilder.toString();
+    }
+
+    public JsonNode getOverallFeedback(List<Map<String, Object>> messages, String scenarioId) throws Exception {
+        // Retrieve dynamic marking rubric description from database
+        String dynamicRubric = buildMarkingRubricDescription(scenarioId);
+
         // Construct the response_format as per the curl command
         Map<String, Object> responseFormat = new HashMap<>();
         responseFormat.put("type", "json_schema");
@@ -52,46 +77,11 @@ public class FinalOpenAiClient {
         Map<String, Object> properties = new HashMap<>();
         properties.put("overallFeedback", Map.of(
                 "type", "string",
-                "description", "Overall feedback for the whole conversation. Grading rubric: Clinical Communication Skills (C)\n" +
-                        "Key Issues: Breaking the news in a clear, empathetic, and sensitive manner. Avoiding medical jargon and using language that the patient can understand.\n" +
-                        "Satisfactory: Uses simple, clear language; explains the diagnosis empathetically and at a pace the patient can follow. Maintains eye contact and demonstrates active listening.\n" +
-                        "Borderline: Uses some jargon but attempts to clarify terms. Breaks the news abruptly but shows some effort to console the patient. Limited engagement with the patient’s emotional cues.\n" +
-                        "Unsatisfactory: Uses excessive jargon or is too blunt in delivering the diagnosis. Fails to acknowledge or address the patient’s emotional response. Shows little or no empathy.\n" +
-                        "\n" +
-                        "Managing Patient’s Concerns (F)\n" +
-                        "\n" +
-                        "Key Issues: Addressing patient’s questions and emotions effectively, including disbelief, fear, and concerns about the family’s future.\n" +
-                        "\n" +
-                        "Satisfactory: Acknowledges the patient’s shock and provides reassurance. Encourages the patient to express emotions and validates their concerns. Offers appropriate answers to questions about prognosis and next steps.\n" +
-                        "\n" +
-                        "Borderline: Addresses some concerns but misses key emotional cues (e.g., family impact). Reassurance is vague or inconsistent.\n" +
-                        "\n" +
-                        "Unsatisfactory: Avoids or dismisses patient’s concerns. Provides inadequate explanations or gives false hope. May become defensive or argumentative if the patient is distressed.\n" +
-                        "\n" +
-                        "Clinical Judgement (E)\n" +
-                        "\n" +
-                        "Key Issues: Providing accurate and honest information about the diagnosis and prognosis. Offering realistic next steps, including symptom management and palliative care options.\n" +
-                        "\n" +
-                        "Satisfactory: Clearly communicates the advanced nature of the cancer and the lack of curative options. Explains the role of palliative care in managing symptoms and quality of life.\n" +
-                        "\n" +
-                        "Borderline: Gives incomplete information about the diagnosis or prognosis. Lacks clarity when explaining symptom management or next steps.\n" +
-                        "\n" +
-                        "Unsatisfactory: Provides misleading or inaccurate information. Fails to discuss symptom management or palliative care appropriately.\n" +
-                        "\n" +
-                        "Maintaining Patient Welfare (G)\n" +
-                        "\n" +
-                        "Key Issues: Ensuring that the patient feels supported and respected during the consultation. Demonstrating professionalism and empathy throughout.\n" +
-                        "\n" +
-                        "Satisfactory: Maintains a compassionate and professional demeanor. Offers emotional support and reassures the patient that they will be cared for. Refers appropriately to palliative care or spiritual support services.\n" +
-                        "\n" +
-                        "Borderline: Shows professionalism but lacks consistent empathy. Emotional support is minimal or not tailored to the patient’s needs.\n" +
-                        "\n" +
-                        "Unsatisfactory: Appears rushed or disengaged. Shows little concern for the patient’s emotional well-being. Does not offer appropriate referrals or support services." +
-                        "Please give the user appropriate thing to say or thing to do as example so that the user (doctor) can improve."
+                "description", dynamicRubric   // Use the dynamic rubric from the DB
         ));
         properties.put("top3Mistakes", Map.of(
                 "type", "array",
-                "description", "List of the top 3 mistakes that user (doctor) made when talking to patient, and give some example or what they should do so that user (doctor) can improve.",
+                "description", "List of the top 3 mistakes that the user (doctor) made during the conversation. Include examples or suggestions for improvement.",
                 "items", Map.of(
                         "type", "object",
                         "properties", Map.of(
@@ -141,7 +131,7 @@ public class FinalOpenAiClient {
 
         // Serialize the request body to JSON
         String requestBodyJson = objectMapper.writeValueAsString(requestBody);
-        System.out.println("check request body json" + requestBodyJson);
+        System.out.println("check request body json: " + requestBodyJson);
 
         // Build the HTTP request
         HttpRequest request = HttpRequest.newBuilder()

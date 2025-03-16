@@ -2,7 +2,6 @@ package com.communication.communication_backend.service.overallFeedback;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -17,7 +16,7 @@ import com.communication.communication_backend.service.toneAnalysis.ToneAnalysis
 
 import java.util.*;
 
-public class ExchangesandFacialConsumer {
+public class ExchangeSendFacialConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
@@ -34,11 +33,11 @@ public class ExchangesandFacialConsumer {
     private final Queue<JsonNode> jsonNodeQueue = new LinkedList<>();
     private List<JsonNode> facialEmotionData = new ArrayList<>(); // To store facial emotion data for the whole session
 
-    public ExchangesandFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
-                             FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
-                             KafkaTemplate<String, String> kafkaTemplate,
-                             ConsumerFactory<String, String> consumerFactory,
-                             GptResponseConsumer gptResponseConsumer) {
+    public ExchangeSendFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+                                      FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
+                                      KafkaTemplate<String, String> kafkaTemplate,
+                                      ConsumerFactory<String, String> consumerFactory,
+                                      GptResponseConsumer gptResponseConsumer) {
         this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
         this.facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicName;
         this.kafkaTemplate = kafkaTemplate;
@@ -108,7 +107,7 @@ public class ExchangesandFacialConsumer {
         }
     }
 
-    public JsonNode endChat() {
+    public JsonNode endChat(String scenarioId) {
         if (jsonNodeQueue.isEmpty()) {
             System.err.println("No messages to process for feedback.");
             return null;
@@ -135,7 +134,7 @@ public class ExchangesandFacialConsumer {
         try {
             ObjectMapper objectMapper1 = new ObjectMapper();
             System.out.println("try check message" + messages);
-            JsonNode feedback = finalOpenAiClient.getOverallFeedback(messages);
+            JsonNode feedback = finalOpenAiClient.getOverallFeedback(messages, scenarioId);
             kafkaTemplate.send(toneAnalysisKafkaTopicName.getOverallFeedback(), objectMapper1.writeValueAsString(feedback));
             // Optionally, clear the queue after processing
             jsonNodeQueue.clear();

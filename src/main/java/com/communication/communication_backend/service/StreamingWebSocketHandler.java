@@ -9,7 +9,7 @@ import com.communication.communication_backend.service.overallFeedback.GptRespon
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackExchangesConsumer;
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicName;
 import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicNameFactory;
-import com.communication.communication_backend.service.overallFeedback.ExchangesandFacialConsumer;
+import com.communication.communication_backend.service.overallFeedback.ExchangeSendFacialConsumer;
 import com.communication.communication_backend.service.toneAnalysis.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -69,10 +69,11 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private OverallFeedbackKafkaTopicNameFactory overallFeedbackKafkaTopicNameFactory;
     private OverallFeedbackKafkaTopicName overallFeedbackKafkaTopicName;
     private String sessionDateTime;
+    private String scenarioId;
 
     private GptResponseConsumer gptResponseConsumer;
     private OverallFeedbackExchangesConsumer overallFeedbackExchangesConsumer;
-    private ExchangesandFacialConsumer exchangesandfacialConsumer;
+    private ExchangeSendFacialConsumer exchangesandfacialConsumer;
     @Autowired
     private ApplicationContext context;
 
@@ -169,14 +170,26 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         if (uri != null) {
             UriComponents uriComponents = UriComponentsBuilder.fromUri(uri).build();
             Map<String, String> queryParams = uriComponents.getQueryParams().toSingleValueMap();
-            sessionDateTime = URLDecoder.decode(queryParams.get("sessionDateTime"));
-            sessionDateTime = sessionDateTime.replace(":", "-");
+            if (queryParams.containsKey("sessionDateTime")) {
+                sessionDateTime = URLDecoder.decode(queryParams.get("sessionDateTime"), StandardCharsets.UTF_8);
+                sessionDateTime = sessionDateTime.replace(":", "-");
+            }
+
+            if (queryParams.containsKey("scenarioId")) {
+                this.scenarioId = URLDecoder.decode(queryParams.get("scenarioId"), StandardCharsets.UTF_8);
+            }
         }
 
         if (sessionDateTime != null) {
             System.out.println("SessionDateTime received: " + sessionDateTime);
         } else {
-            // Handle missing 'sessionDateTime' parameter
+            System.err.println("Missing 'sessionDateTime' parameter.");
+        }
+
+        if (scenarioId != null) {
+            System.out.println("Scenario ID received: " + scenarioId);
+        } else {
+            System.err.println("Missing 'scenarioId' parameter.");
         }
 
         // configure tone analysis
@@ -191,12 +204,6 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
         overallFeedbackKafkaTopicName = overallFeedbackKafkaTopicNameFactory.create(sessionDateTime, userId);
 
-//        humeAudioClient = context.getBean(HumeAIAudioWebSocketClient.class, humeUri, session,
-//                toneAnalysisKafkaTopicName);
-//
-//
-//        humeAudioClient.connectBlocking();
-
         videoData = new ByteArrayOutputStream();
 
         facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicNameFactory.create(sessionDateTime, userId);
@@ -206,12 +213,14 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
         context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
         shortenedConsumer = context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
-        this.exchangesandfacialConsumer = context.getBean(ExchangesandFacialConsumer.class, toneAnalysisKafkaTopicName);
+
 
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
 //        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
         gptResponseConsumer = context.getBean(GptResponseConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
+        this.exchangesandfacialConsumer = context.getBean(ExchangeSendFacialConsumer.class,
+                toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, gptResponseConsumer);
         overallFeedbackExchangesConsumer = context.getBean(OverallFeedbackExchangesConsumer.class, toneAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
     }
 
@@ -277,10 +286,6 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
     private void processAudioData(WebSocketSession session, byte[] message) throws IOException {
         audioData.write(message);
-
-//        if (humeAudioClient != null && humeAudioClient.isOpen()) {
-//            humeAudioClient.sendAudioData(message);
-//        }
     }
 
     private void processVideoData(WebSocketSession session, byte[] message) throws IOException {
@@ -288,16 +293,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     }
 
     private void processImageData(WebSocketSession session, byte[] message) throws IOException {
-        // Example processing: Save the image to a directory
-//        String imagePath = "received_images/" + sessionDateTime + "_" + System.currentTimeMillis() + ".jpg";
-//        Files.createDirectories(Paths.get("received_images"));
-//        try (FileOutputStream fos = new FileOutputStream(imagePath)) {
-//            fos.write(message);
-//        }
         humeAIExpressionManagementWebSocketClient.sendImage(Base64.getEncoder().encodeToString(message));
-
-        // Add additional processing logic here
-        // e.g., send to facial analysis service
     }
 
     private void endChat(String chatId, long msDifference) throws IOException, InterruptedException {
@@ -314,7 +310,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                         throw new RuntimeException(e);
                     }
                 })
-                .thenRun(() -> this.overallFeedback = exchangesandfacialConsumer.endChat())
+                .thenRun(() -> this.overallFeedback = exchangesandfacialConsumer.endChat(scenarioId))
                 .join();
 
         long currentTime = System.currentTimeMillis();
@@ -426,14 +422,5 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) throws Exception {
         super.afterConnectionClosed(session, status);
-
-        // Close Hume AI clients
-//        if (humeAudioClient != null && humeAudioClient.isOpen()) {
-//            humeAudioClient.close();
-//        }
-
-//        if (humeAIBatchProcessingClient != null) {
-//            humeAIBatchProcessingClient.shutdown();
-//        }
     }
 }

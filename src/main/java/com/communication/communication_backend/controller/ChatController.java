@@ -26,6 +26,7 @@ public class ChatController implements WebSocketConfigurer {
         ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
         container.setMaxTextMessageBufferSize(500 * 1024);
         container.setMaxBinaryMessageBufferSize(500 * 1024);
+        container.setMaxSessionIdleTimeout(30 * 60 * 1000L);
         return container;
     }
 }

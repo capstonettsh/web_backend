@@ -134,13 +134,15 @@ public class ScenarioController {
 
     // Save a marking schema
     @PostMapping("/{configId}/marking-schema")
-    public ResponseEntity<String> saveMarkingSchema(@PathVariable("configId") int configId, @RequestBody MarkingSchema markingSchema) {
+    public ResponseEntity<String> saveMarkingSchema(
+            @PathVariable("configId") int configId,
+            @RequestBody List<MarkingSchema> markingSchemas) {
         try {
-            scenarioService.saveMarkingSchema(configId, markingSchema);
-            return ResponseEntity.ok("Marking schema saved successfully.");
+            scenarioService.saveMarkingSchema(configId, markingSchemas);
+            return ResponseEntity.ok("Marking schemas saved successfully.");
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Failed to save marking schema.");
+            return ResponseEntity.status(500).body("Failed to save marking schemas.");
         }
     }
 
