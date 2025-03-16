@@ -79,7 +79,7 @@ public class ExchangesConsumer {
         }
     }
 
-    public JsonNode endChat() {
+    public JsonNode endChat(String scenarioId) {
         if (jsonNodeQueue.isEmpty()) {
             System.err.println("No messages to process for feedback.");
             return null;
@@ -106,7 +106,7 @@ public class ExchangesConsumer {
         try {
             ObjectMapper objectMapper1 = new ObjectMapper();
             System.out.println("try check message" + messages);
-            JsonNode feedback = finalOpenAiClient.getOverallFeedback(messages);
+            JsonNode feedback = finalOpenAiClient.getOverallFeedback(messages, scenarioId);
             kafkaTemplate.send(toneAnalysisKafkaTopicName.getOverallFeedback(), objectMapper1.writeValueAsString(feedback));
             // Optionally, clear the queue after processing
             jsonNodeQueue.clear();

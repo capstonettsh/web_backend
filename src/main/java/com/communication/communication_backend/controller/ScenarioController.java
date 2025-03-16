@@ -1,17 +1,15 @@
 package com.communication.communication_backend.controller;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
+import com.communication.communication_backend.dtos.ScenarioSummary;
 import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
-import com.communication.communication_backend.dtos.ScenarioSummary;
+import com.communication.communication_backend.service.creatingScenarios.ScenarioService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/config")
@@ -47,21 +45,20 @@ public class ScenarioController {
     }
 
     // Retrieve a specific scenario's details
-//    @GetMapping("/{configId}/scenario-prompt")
-//    public ResponseEntity<Scenario> getScenario(@PathVariable int configId) {
-//        return scenarioService.getScenarioById(configId)
-//                .map(ResponseEntity::ok)
-//                .orElse(ResponseEntity.notFound().build());
-//    }
+    // @GetMapping("/{configId}/scenario-prompt")
+    // public ResponseEntity<Scenario> getScenario(@PathVariable int configId) {
+    //     return scenarioService.getScenarioById(configId)
+    //             .map(ResponseEntity::ok)
+    //             .orElse(ResponseEntity.notFound().build());
+    // }
 
     // Retrieve full scenario details (both basic and additional)
     @GetMapping("/{configId}/scenario")
-    public ResponseEntity<Scenario> getScenario(@PathVariable int configId) {
+    public ResponseEntity<Scenario> getScenario(@PathVariable("configId") int configId) {
         return scenarioService.getScenarioById(configId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
 
     // Add a scenario summary to the global list (for the overview page)
 //    @PostMapping
@@ -70,6 +67,7 @@ public class ScenarioController {
 //        scenarioService.saveScenario(summary.getConfigId(), scenario);
 //        return ResponseEntity.ok("Scenario summary saved successfully.");
 //    }
+
 
     // Retrieve all scenario summaries
     @GetMapping
@@ -93,21 +91,34 @@ public class ScenarioController {
             return ResponseEntity.ok(updatedScenario);
         } catch (Exception e) {
             e.printStackTrace(); // Log error for debugging
-            return ResponseEntity.status(500).build();
+            return ResponseEntity.status(500).body(null);
         }
     }
 
     // Save the generated scenario (AI-generated)
-//    @PostMapping("/{configId}/scenario")
-//    public ResponseEntity<String> saveGeneratedScenario(@PathVariable("configId") int configId, @RequestBody GeneratedScenario generatedScenario) {
-//        try {
-//            scenarioService.saveGeneratedScenario(configId, generatedScenario);
-//            return ResponseEntity.ok("Generated scenario saved successfully for configId: " + configId);
-//        } catch (Exception e) {
-//            e.printStackTrace(); // Log error for debugging
-//            return ResponseEntity.status(500).body("Failed to save generated scenario.");
-//        }
-//    }
+    // @PostMapping("/{configId}/scenario")
+    // public ResponseEntity<String> saveGeneratedScenario(@PathVariable("configId") int configId, @RequestBody GeneratedScenario generatedScenario) {
+    //     try {
+    //         scenarioService.saveGeneratedScenario(configId, generatedScenario);
+    //         return ResponseEntity.ok("Generated scenario saved successfully for configId: " + configId);
+    //     } catch (Exception e) {
+    //         e.printStackTrace(); // Log error for debugging
+    //         return ResponseEntity.status(500).body("Failed to save generated scenario.");
+    //     }
+    // }
+
+    // Retrieve saved generated scenario
+    // @GetMapping("/{configId}/scenario")
+    // public ResponseEntity<GeneratedScenario> getGeneratedScenario(@PathVariable("configId") int configId) {
+    //     try {
+    //         Optional<GeneratedScenario> generatedScenario = scenarioService.getGeneratedScenario(configId);
+    //         return generatedScenario.map(ResponseEntity::ok)
+    //                 .orElse(ResponseEntity.notFound().build());
+    //     } catch (Exception e) {
+    //         e.printStackTrace(); // Log error for debugging
+    //         return ResponseEntity.status(500).body(null);
+    //     }
+    // }
 
     // Generate a new marking schema
     @GetMapping("/{configId}/marking-schema/generate")
@@ -123,13 +134,15 @@ public class ScenarioController {
 
     // Save a marking schema
     @PostMapping("/{configId}/marking-schema")
-    public ResponseEntity<String> saveMarkingSchema(@PathVariable("configId") int configId, @RequestBody MarkingSchema markingSchema) {
+    public ResponseEntity<String> saveMarkingSchema(
+            @PathVariable("configId") int configId,
+            @RequestBody List<MarkingSchema> markingSchemas) {
         try {
-            scenarioService.saveMarkingSchema(configId, markingSchema);
-            return ResponseEntity.ok("Marking schema saved successfully.");
+            scenarioService.saveMarkingSchema(configId, markingSchemas);
+            return ResponseEntity.ok("Marking schemas saved successfully.");
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Failed to save marking schema.");
+            return ResponseEntity.status(500).body("Failed to save marking schemas.");
         }
     }
 

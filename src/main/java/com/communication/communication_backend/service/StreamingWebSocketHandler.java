@@ -68,6 +68,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
     private OverallFeedbackKafkaTopicNameFactory overallFeedbackKafkaTopicNameFactory;
     private OverallFeedbackKafkaTopicName overallFeedbackKafkaTopicName;
     private String sessionDateTime;
+    private String scenarioId;
 
     private GptResponseConsumer gptResponseConsumer;
     private OverallFeedbackExchangesConsumer overallFeedbackExchangesConsumer;
@@ -168,14 +169,26 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
         if (uri != null) {
             UriComponents uriComponents = UriComponentsBuilder.fromUri(uri).build();
             Map<String, String> queryParams = uriComponents.getQueryParams().toSingleValueMap();
-            sessionDateTime = URLDecoder.decode(queryParams.get("sessionDateTime"));
-            sessionDateTime = sessionDateTime.replace(":", "-");
+            if (queryParams.containsKey("sessionDateTime")) {
+                sessionDateTime = URLDecoder.decode(queryParams.get("sessionDateTime"), StandardCharsets.UTF_8);
+                sessionDateTime = sessionDateTime.replace(":", "-");
+            }
+
+            if (queryParams.containsKey("scenarioId")) {
+                this.scenarioId = URLDecoder.decode(queryParams.get("scenarioId"), StandardCharsets.UTF_8);
+            }
         }
 
         if (sessionDateTime != null) {
             System.out.println("SessionDateTime received: " + sessionDateTime);
         } else {
-            // Handle missing 'sessionDateTime' parameter
+            System.err.println("Missing 'sessionDateTime' parameter.");
+        }
+
+        if (scenarioId != null) {
+            System.out.println("Scenario ID received: " + scenarioId);
+        } else {
+            System.err.println("Missing 'scenarioId' parameter.");
         }
 
         // configure tone analysis
@@ -313,7 +326,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                         throw new RuntimeException(e);
                     }
                 })
-                .thenRun(() -> this.overallFeedback = exchangesConsumer.endChat())
+                .thenRun(() -> this.overallFeedback = exchangesConsumer.endChat(this.scenarioId))
                 .join();
 
         long currentTime = System.currentTimeMillis();
