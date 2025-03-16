@@ -5,20 +5,33 @@ import com.communication.communication_backend.entity.MarkingSchema;
 import com.communication.communication_backend.entity.Scenario;
 import com.communication.communication_backend.repository.MarkingSchemaRepository;
 import com.communication.communication_backend.repository.ScenarioRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.*;
 
 @Service
 public class ScenarioService {
 
+    private static final String CREATE_CONFIG_URL = "https://api.hume.ai/v0/evi/configs";
+    private static final String CREATE_PROMPT_URL = "https://api.hume.ai/v0/evi/prompts";
     private final ScenariosOpenAiClient openAiClient;
     private final RubricsOpenAiClient rubricsOpenAiClient;
     private final ScenarioRepository scenarioRepository;
     // private final GeneratedScenarioRepository generatedScenarioRepository;
     private final MarkingSchemaRepository markingSchemaRepository;
+    @Value("${humeai.api.key}")
+    private String humeaiApiKey;
+
 
     public ScenarioService(
             ScenariosOpenAiClient openAiClient,
@@ -53,17 +66,152 @@ public class ScenarioService {
     // Save scenario details (title, shortDescription, prompt, userId)
     public void saveBasicScenario(int scenarioId, Scenario scenario) {
         Scenario existingScenario = scenarioRepository.findById(scenarioId)
-                .orElseThrow(() -> new NoSuchElementException("Scenario with scenarioId " + scenarioId + " not found" +
-                        "."));
+                .orElseThrow(() -> new NoSuchElementException("Scenario with scenarioId " + scenarioId + " not found."));
 
         existingScenario.setTitle(scenario.getTitle());
         existingScenario.setShortDescription(scenario.getShortDescription());
         existingScenario.setPrompt(scenario.getPrompt());
-        existingScenario.setUserId(scenario.getUserId()); // Assign the userId
+        existingScenario.setUserId(scenario.getUserId());
+
+        String newConfigId = createHumeConfig(existingScenario);
+        existingScenario.setAgentId(newConfigId);
 
         scenarioRepository.save(existingScenario);
     }
 
+    // Create a prompt on Hume AI and return its id
+    private String createPrompt(Scenario scenario) {
+        // Build the prompt payload.
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", scenario.getTitle() + UUID.randomUUID().toString());
+        payload.put("text", scenario.getBackgroundInformation() + scenario.getPersonality() + scenario.getQuestionsForDoctor() + scenario.getResponseGuidelines() + scenario.getSampleResponses() + ".Try to generate short sentence for the response, disclose information step by step based on user response, use a lot of annotation to express emotion.");
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize prompt payload to JSON", e);
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(CREATE_PROMPT_URL))
+                .header("X-Hume-Api-Key", humeaiApiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpClient client = HttpClient.newHttpClient();
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            int statusCode = response.statusCode();
+            if (statusCode >= 200 && statusCode < 300) {
+                Map<String, Object> responseMap = objectMapper.readValue(response.body(), Map.class);
+                if (responseMap != null && responseMap.containsKey("id")) {
+                    return (String) responseMap.get("id");
+                } else {
+                    throw new RuntimeException("Prompt id not found in response");
+                }
+            } else {
+                throw new RuntimeException("Failed to create prompt. HTTP status code: " + statusCode);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("HTTP request to create prompt failed", e);
+        }
+    }
+
+    // Create a new Hume AI config using the created prompt id
+    private String createHumeConfig(Scenario scenario) {
+        // Create a prompt first and get its id
+        String promptId = createPrompt(scenario);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("evi_version", "2");
+        // Use scenario title as the config name (or customize as needed)
+        payload.put("name", scenario.getTitle() + UUID.randomUUID().toString());
+
+        // Use the prompt id returned from createPrompt()
+        Map<String, Object> prompt = new HashMap<>();
+        prompt.put("id", promptId);
+        prompt.put("version", 0);
+        payload.put("prompt", prompt);
+
+        // Voice configuration using a custom voice
+        Map<String, Object> voice = new HashMap<>();
+        voice.put("provider", "CUSTOM_VOICE");
+        Map<String, Object> customVoice = new HashMap<>();
+        customVoice.put("name", "LIM WEI JIE 3");
+        customVoice.put("base_voice", "SUNNY");
+        customVoice.put("description", "More Masculine");
+        customVoice.put("parameter_model", "20241004-11parameter");
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("assertiveness", -13);
+        parameters.put("buoyancy", 8);
+        parameters.put("confidence", -9);
+        parameters.put("enthusiasm", -9);
+        parameters.put("nasality", -8);
+        parameters.put("relaxedness", -9);
+        parameters.put("smoothness", -8);
+        parameters.put("tepidity", 9);
+        parameters.put("tightness", 7);
+        customVoice.put("parameters", parameters);
+        voice.put("custom_voice", customVoice);
+        payload.put("voice", voice);
+
+        // Language model configuration using Open AI's GPT-4o
+        Map<String, Object> languageModel = new HashMap<>();
+        languageModel.put("model_provider", "OPEN_AI");
+        languageModel.put("model_resource", "gpt-4o");
+        languageModel.put("temperature", 1);
+        payload.put("language_model", languageModel);
+
+        // Timeouts configuration (25 minutes = 1500 seconds for max duration)
+        Map<String, Object> timeouts = new HashMap<>();
+        Map<String, Object> inactivity = new HashMap<>();
+        inactivity.put("enabled", true);
+        inactivity.put("duration_secs", 600);
+        timeouts.put("inactivity", inactivity);
+        Map<String, Object> maxDuration = new HashMap<>();
+        maxDuration.put("enabled", true);
+        maxDuration.put("duration_secs", 1500);
+        timeouts.put("max_duration", maxDuration);
+        payload.put("timeouts", timeouts);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to convert config payload to JSON", e);
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(CREATE_CONFIG_URL))
+                .header("X-Hume-Api-Key", humeaiApiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpClient client = HttpClient.newHttpClient();
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            int statusCode = response.statusCode();
+            if (statusCode >= 200 && statusCode < 300) {
+                Map<String, Object> responseMap = objectMapper.readValue(response.body(), Map.class);
+                if (responseMap != null && responseMap.containsKey("id")) {
+                    return (String) responseMap.get("id");
+                } else {
+                    throw new RuntimeException("Config id not found in response");
+                }
+            } else {
+                throw new RuntimeException("Failed to create Hume config. HTTP status code: " + statusCode);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("HTTP request to create Hume config failed", e);
+        }
+    }
+
+    // Save additional scenario details (taskInstruction, backgroundInformation, personality, etc.)
     public void saveScenarioDetails(int scenarioId, Scenario scenarioData) {
         Scenario scenario = scenarioRepository.findById(scenarioId)
                 .orElseThrow(() -> new NoSuchElementException("Scenario with configId " + scenarioId + " not found."));
@@ -73,6 +221,11 @@ public class ScenarioService {
         scenario.setQuestionsForDoctor(scenarioData.getQuestionsForDoctor());
         scenario.setResponseGuidelines(scenarioData.getResponseGuidelines());
         scenario.setSampleResponses(scenarioData.getSampleResponses());
+
+        // Always create a new config when scenario details are updated.
+        String newConfigId = createHumeConfig(scenario);
+        scenario.setAgentId(newConfigId);
+
         scenarioRepository.save(scenario);
     }
 
