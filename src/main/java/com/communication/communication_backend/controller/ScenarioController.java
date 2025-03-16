@@ -54,7 +54,7 @@ public class ScenarioController {
 
     // Retrieve full scenario details (both basic and additional)
     @GetMapping("/{configId}/scenario")
-    public ResponseEntity<Scenario> getScenario(@PathVariable int configId) {
+    public ResponseEntity<Scenario> getScenario(@PathVariable("configId") int configId) {
         return scenarioService.getScenarioById(configId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
