@@ -35,16 +35,6 @@ public class ToneAnalysisConfig {
 
     @Bean
     @Scope("prototype")
-    public ExchangesandFacialConsumer exchangesConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
-                                               FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName, // Add this argument
-                                               KafkaTemplate<String, String> kafkaTemplate,
-                                               ConsumerFactory<String, String> consumerFactory,
-                                               GptResponseConsumer gptResponseConsumer) {
-        return new ExchangesandFacialConsumer(toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory, gptResponseConsumer);
-    }
-
-    @Bean
-    @Scope("prototype")
     public HumeAiChatReader humeAiChatReader(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName) {
         return new HumeAiChatReader(kafkaTemplate, toneAnalysisKafkaTopicName);
     }
