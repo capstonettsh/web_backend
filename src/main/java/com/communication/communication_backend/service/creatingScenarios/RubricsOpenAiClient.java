@@ -1,12 +1,7 @@
-package com.communication.communication_backend.service.toneAnalysis;
+package com.communication.communication_backend.service.creatingScenarios;
 
-import com.communication.communication_backend.entity.MarkingSchema;
-import com.communication.communication_backend.entity.Scenario;
-import com.communication.communication_backend.repository.MarkingSchemaRepository;
-import com.communication.communication_backend.repository.ScenarioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,8 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class FinalOpenAiClient {
-
+public class RubricsOpenAiClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
@@ -30,47 +24,12 @@ public class FinalOpenAiClient {
     @Value("${chatgpt.api.key}")
     private String apiKey;
 
-    @Autowired
-    private MarkingSchemaRepository markingSchemaRepository;
-
-    @Autowired
-    private ScenarioRepository scenarioRepository;
-
-
-    public FinalOpenAiClient() {
+    public RubricsOpenAiClient() {
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper();
     }
 
-    private String buildMarkingRubricDescription(String scenarioId) throws Exception {
-        int scenarioIdInt = Integer.parseInt(scenarioId);
-        // Fetch the scenario by ID
-        Scenario scenario = scenarioRepository.findById(scenarioIdInt)
-                .orElseThrow(() -> new Exception("Scenario not found for id: " + scenarioId));
-        // Get the marking schemas for the scenario
-        List<MarkingSchema> markingSchemas = markingSchemaRepository.findByScenario(scenario);
-
-        StringBuilder rubricBuilder = new StringBuilder();
-        for (MarkingSchema schema : markingSchemas) {
-            // Assume your MarkingSchema entity has fields like category, description, and gradingCriteria
-            rubricBuilder.append("Category: ").append(schema.getTitle()).append("\n");
-            rubricBuilder.append("Description: ").append("Unsatisfactory: " + schema.getUnsatisfactory() + "\n" + "Borderline:" + schema.getBorderline() + "\n" + "Satisfactory:" + schema.getSatisfactory()).append(
-                    "\n");
-        }
-        return rubricBuilder.toString();
-    }
-
-    /**
-     * Sends the collected chat messages to OpenAI's API and retrieves the overall feedback.
-     *
-     * @param messages List of messages containing role and content.
-     * @return JsonNode representing the mistake summary.
-     * @throws Exception if there's an error during the API call.
-     */
-    public JsonNode getOverallFeedback(List<Map<String, Object>> messages, String scenarioId) throws Exception {
-        // Retrieve dynamic marking rubric description from database
-        String dynamicRubric = buildMarkingRubricDescription(scenarioId);
-
+    public JsonNode getGeneratedRubrics(List<Map<String, Object>> messages) throws Exception {
         // Construct the response_format as per the curl command
         Map<String, Object> responseFormat = new HashMap<>();
         responseFormat.put("type", "json_schema");
@@ -83,44 +42,37 @@ public class FinalOpenAiClient {
         schema.put("type", "object");
 
         Map<String, Object> properties = new HashMap<>();
-        properties.put("overallFeedback", Map.of(
-                "type", "string",
-                "description", dynamicRubric   // Use the dynamic rubric from the DB
-        ));
-        properties.put("top3Mistakes", Map.of(
+
+        properties.put("generatedRubrics", Map.of(
                 "type", "array",
-                "description", "List of the top 3 mistakes that the user (doctor) made during the conversation. Include examples or suggestions for improvement.",
+                "description", "You are to help with generating a marking rubric schema to evaluate the performance of medical students in a training application that helps medical students to practise their communication skills. The users of this application are medical students. A trained doctor overseeing the communication training has given the title of a mock patient scenario, the description of the same mock patient scenario (and possibly a prompt as well), task instructions for that mock scenario and the title of a marking rubric schema are presented to you. Generate a marking rubric schema to evaluate the performance of medical students in a mock patient scenario given the information and the title of the marking rubric schema presented. The marking rubric schema will consist of 3 levels of performance: unsatisfactory, borderline and satisfactory.",
                 "items", Map.of(
                         "type", "object",
                         "properties", Map.of(
-                                "mistakeText", Map.of(
+                                "title", Map.of(
                                         "type", "string",
-                                        "description", "Description of the mistake."
+                                        "description", "The exact title of this marking rubric schema as presented to you. It should be short. Examples include Communication Skills, Empathy and Clinical Assessment."
                                 ),
-                                "exchangeRef", Map.of(
-                                        "type", "integer",
-                                        "description", "Reference ID for the exchange."
-                                ),
-                                "mistakeReason", Map.of(
+                                "unsatisfactory", Map.of(
                                         "type", "string",
-                                        "description", "Reason for the mistake."
+                                        "description", "Provide a general description of an unsatisfactory performance of the medical student in the mock patient scenario according to the criteria stated by the title of the marking rubric schema you generated earlier. It should be clear and concise."
                                 ),
-                                "userStartTime", Map.of(
-                                        "type", "integer",
-                                        "description", "Start time for the user when the mistake occurred."
+                                "borderline", Map.of(
+                                        "type", "string",
+                                        "description", "Provide a general description of an borderline or passable performance of the medical student in the mock patient scenario according to the criteria stated by the title of the marking rubric schema you generated earlier. It should be clear and concise. It should be better than the unsatisfactory performance."
                                 ),
-                                "userEndTime", Map.of(
-                                        "type", "integer",
-                                        "description", "End time for the user when the mistake was acknowledged."
+                                "satisfactory", Map.of(
+                                        "type", "string",
+                                        "description", "Provide a general description of an satisfactory performance of the medical student in the mock patient scenario according to the criteria stated by the title of the marking rubric schema you generated earlier. It should be clear and concise. It should be greatly better than the borderline performance."
                                 )
                         ),
-                        "required", List.of("mistakeText", "exchangeRef", "mistakeReason", "userStartTime", "userEndTime"),
+                        "required", List.of("title", "unsatisfactory", "borderline", "satisfactory"),
                         "additionalProperties", false
                 )
         ));
 
         schema.put("properties", properties);
-        schema.put("required", List.of("overallFeedback", "top3Mistakes"));
+        schema.put("required", List.of("generatedRubrics"));
         schema.put("additionalProperties", false);
 
         jsonSchema.put("schema", schema);
@@ -132,14 +84,12 @@ public class FinalOpenAiClient {
         requestBody.put("messages", messages);
         requestBody.put("response_format", responseFormat);
         requestBody.put("temperature", 1);
-        requestBody.put("max_completion_tokens", 4048);
         requestBody.put("top_p", 1);
         requestBody.put("frequency_penalty", 0);
         requestBody.put("presence_penalty", 0);
 
         // Serialize the request body to JSON
         String requestBodyJson = objectMapper.writeValueAsString(requestBody);
-        System.out.println("check request body json: " + requestBodyJson);
 
         // Build the HTTP request
         HttpRequest request = HttpRequest.newBuilder()
@@ -152,6 +102,8 @@ public class FinalOpenAiClient {
         // Send the request and get the response
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
+        System.out.println(response);
+        System.out.println(response.body());
         // Check if the response status is OK
         if (response.statusCode() == 200) {
             JsonNode responseBody = objectMapper.readTree(response.body());
