@@ -22,10 +22,8 @@ public class OverallFeedbackConfig {
     @Bean
     @Scope("prototype")
     public ExchangesandFacialConsumer exchangesandfacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
-                                               FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName, // Add this argument
-                                               KafkaTemplate<String, String> kafkaTemplate,
-                                               ConsumerFactory<String, String> consumerFactory,
-                                               GptResponseConsumer gptResponseConsumer) {
+                                                                 FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName, // Add this argument
+                                                                 GptResponseConsumer gptResponseConsumer) {
         return new ExchangesandFacialConsumer(toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, kafkaTemplate, consumerFactory, gptResponseConsumer);
     }
 

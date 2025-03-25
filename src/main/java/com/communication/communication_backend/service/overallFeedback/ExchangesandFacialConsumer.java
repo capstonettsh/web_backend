@@ -4,10 +4,8 @@ import com.communication.communication_backend.service.facialAnalysis.FacialAnal
 import com.communication.communication_backend.service.toneAnalysis.FinalOpenAiClient;
 import com.communication.communication_backend.service.toneAnalysis.OpenAiClient;
 import com.communication.communication_backend.service.toneAnalysis.ToneAnalysisKafkaTopicName;
-import com.communication.communication_backend.service.overallFeedback.ExchangesandFacialConsumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -26,20 +24,18 @@ public class ExchangesandFacialConsumer {
     private final ConsumerFactory<String, String> consumerFactory;
     private final KafkaMessageListenerContainer<String, String> container;
     private final GptResponseConsumer gptResponseConsumer;
+    private final Queue<JsonNode> jsonNodeQueue = new LinkedList<>();
     @Autowired
     private OpenAiClient openAiClient;
-
     @Autowired
     private FinalOpenAiClient finalOpenAiClient;
-
-    private final Queue<JsonNode> jsonNodeQueue = new LinkedList<>();
     private List<JsonNode> facialEmotionData = new ArrayList<>(); // To store facial emotion data for the whole session
 
     public ExchangesandFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
-                             FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
-                             KafkaTemplate<String, String> kafkaTemplate,
-                             ConsumerFactory<String, String> consumerFactory,
-                             GptResponseConsumer gptResponseConsumer) {
+                                      FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
+                                      KafkaTemplate<String, String> kafkaTemplate,
+                                      ConsumerFactory<String, String> consumerFactory,
+                                      GptResponseConsumer gptResponseConsumer) {
         this.toneAnalysisKafkaTopicName = toneAnalysisKafkaTopicName;
         this.facialAnalysisKafkaTopicName = facialAnalysisKafkaTopicName;
         this.kafkaTemplate = kafkaTemplate;

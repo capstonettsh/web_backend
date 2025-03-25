@@ -5,11 +5,7 @@ import com.communication.communication_backend.service.facialAnalysis.FacialAnal
 import com.communication.communication_backend.service.facialAnalysis.FacialAnalysisKafkaTopicNameFactory;
 import com.communication.communication_backend.service.facialAnalysis.FacialRawConsumer;
 import com.communication.communication_backend.service.facialAnalysis.HumeAIExpressionManagementWebSocketClient;
-import com.communication.communication_backend.service.overallFeedback.GptResponseConsumer;
-import com.communication.communication_backend.service.overallFeedback.OverallFeedbackExchangesConsumer;
-import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicName;
-import com.communication.communication_backend.service.overallFeedback.OverallFeedbackKafkaTopicNameFactory;
-import com.communication.communication_backend.service.overallFeedback.ExchangesandFacialConsumer;
+import com.communication.communication_backend.service.overallFeedback.*;
 import com.communication.communication_backend.service.toneAnalysis.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -219,12 +215,13 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
         context.getBean(RawConsumer.class, toneAnalysisKafkaTopicName);
         shortenedConsumer = context.getBean(ShortenedConsumer.class, toneAnalysisKafkaTopicName);
-        this.exchangesandfacialConsumer = context.getBean(ExchangesandFacialConsumer.class, toneAnalysisKafkaTopicName);
+
 
         context.getBean(FacialRawConsumer.class, facialAnalysisKafkaTopicName);
 //        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
         gptResponseConsumer = context.getBean(GptResponseConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
+        this.exchangesandfacialConsumer = context.getBean(ExchangesandFacialConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, gptResponseConsumer);
         overallFeedbackExchangesConsumer = context.getBean(OverallFeedbackExchangesConsumer.class, toneAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
     }
 
