@@ -16,7 +16,7 @@ import org.springframework.kafka.listener.MessageListener;
 
 import java.util.*;
 
-public class ExchangesandFacialConsumer {
+public class ExchangesAndFacialConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName;
@@ -31,7 +31,7 @@ public class ExchangesandFacialConsumer {
     private FinalOpenAiClient finalOpenAiClient;
     private List<JsonNode> facialEmotionData = new ArrayList<>(); // To store facial emotion data for the whole session
 
-    public ExchangesandFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
+    public ExchangesAndFacialConsumer(ToneAnalysisKafkaTopicName toneAnalysisKafkaTopicName,
                                       FacialAnalysisKafkaTopicName facialAnalysisKafkaTopicName,
                                       KafkaTemplate<String, String> kafkaTemplate,
                                       ConsumerFactory<String, String> consumerFactory,
@@ -68,10 +68,15 @@ public class ExchangesandFacialConsumer {
             int userEndTime = exchangeNode.get("userEndTime").asInt();
 
             // Get facial emotion data for this exchange from the gptResponseConsumer
-            List<JsonNode> facialEmotionDataForExchange = gptResponseConsumer.getFacialEmotionDataForExchange(facialEmotionData, userBeginTime, userEndTime);
+            List<JsonNode> facialEmotionDataForExchange =
+                    gptResponseConsumer.getFacialEmotionDataForExchange(facialEmotionData, userBeginTime, userEndTime);
 
             // Aggregate the facial emotion data for the exchange
-            JsonNode aggregatedFacialEmotionData = gptResponseConsumer.aggregateFacialEmotionData(facialEmotionDataForExchange);
+            JsonNode aggregatedFacialEmotionData =
+                    gptResponseConsumer.aggregateFacialEmotionData(facialEmotionDataForExchange);
+
+            // Enqueue the exchange node so endChat has access to user/assistant messages
+            jsonNodeQueue.add(exchangeNode);
 
             // Send the combined data to _combined topic
             gptResponseConsumer.sendCombinedData(exchangeNode, aggregatedFacialEmotionData);
@@ -79,6 +84,7 @@ public class ExchangesandFacialConsumer {
             e.printStackTrace();
         }
     }
+
 
     // Listen to facial emotion data from the topic
     private void listenToFacialEmotionData() {
@@ -89,7 +95,7 @@ public class ExchangesandFacialConsumer {
                 consumeFacialEmotionData(record.value());
             }
         });
-        containerProperties.setGroupId("facial-emotion-data-group");
+        containerProperties.setGroupId(facialAnalysisKafkaTopicName.getHumeFaceGPTResponse());
         KafkaMessageListenerContainer<String, String> facialEmotionContainer = new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
         facialEmotionContainer.start();
     }

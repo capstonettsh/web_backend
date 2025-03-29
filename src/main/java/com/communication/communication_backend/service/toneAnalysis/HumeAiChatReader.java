@@ -65,7 +65,7 @@ public class HumeAiChatReader {
             try {
                 // Send the GET request and get the response
                 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
+                System.out.println("check here" + response.body());
                 // Check if the response status is 200 OK
                 if (response.statusCode() == 200) {
                     String responseBody = response.body();

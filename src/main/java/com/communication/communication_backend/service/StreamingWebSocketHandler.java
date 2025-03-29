@@ -69,7 +69,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
     private GptResponseConsumer gptResponseConsumer;
     private OverallFeedbackExchangesConsumer overallFeedbackExchangesConsumer;
-    private ExchangesandFacialConsumer exchangesandfacialConsumer;
+    private ExchangesAndFacialConsumer exchangesandfacialConsumer;
     @Autowired
     private ApplicationContext context;
 
@@ -221,7 +221,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 //        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
         gptResponseConsumer = context.getBean(GptResponseConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
-        this.exchangesandfacialConsumer = context.getBean(ExchangesandFacialConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, gptResponseConsumer);
+        this.exchangesandfacialConsumer = context.getBean(ExchangesAndFacialConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, gptResponseConsumer);
         overallFeedbackExchangesConsumer = context.getBean(OverallFeedbackExchangesConsumer.class, toneAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
     }
 
@@ -270,6 +270,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
             }
 
             String chatId = parts[0];
+            System.out.println("get this chatId: " + chatId);
             long msDifference;
             try {
                 msDifference = Long.parseLong(parts[1]);

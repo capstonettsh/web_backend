@@ -122,11 +122,11 @@ public class GptResponseConsumer {
     // Method to get facial emotion data for a specific exchange
     public List<JsonNode> getFacialEmotionDataForExchange(List<JsonNode> facialEmotionData, int oldUserBeginTime, int newUserBeginTime) {
         List<JsonNode> matchingFacialData = new ArrayList<>();
-        JsonNode speechNode = speechMessagesQueue.remove();
+        JsonNode speechNode = speechMessagesQueue.poll();
 
         for (JsonNode facialEmotion : facialEmotionData) {
             int startTime = facialEmotion.get("startTime").asInt();
-            if (startTime + FACIAL_INTERVAL/2 >= oldUserBeginTime && startTime <= newUserBeginTime) {
+            if (startTime + FACIAL_INTERVAL / 2 >= oldUserBeginTime && startTime <= newUserBeginTime) {
                 matchingFacialData.add(facialEmotion);
             }
         }
