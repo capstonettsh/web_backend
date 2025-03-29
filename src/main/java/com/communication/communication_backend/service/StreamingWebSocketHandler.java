@@ -69,7 +69,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 
     private GptResponseConsumer gptResponseConsumer;
     private OverallFeedbackExchangesConsumer overallFeedbackExchangesConsumer;
-    private ExchangesAndFacialConsumer exchangesandfacialConsumer;
+    private ExchangesAndFacialConsumer exchangesAndfacialConsumer;
     @Autowired
     private ApplicationContext context;
 
@@ -221,7 +221,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
 //        context.getBean(FacialRankedConsumer.class, facialAnalysisKafkaTopicName);
 
         gptResponseConsumer = context.getBean(GptResponseConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
-        this.exchangesandfacialConsumer = context.getBean(ExchangesAndFacialConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, gptResponseConsumer);
+        this.exchangesAndfacialConsumer = context.getBean(ExchangesAndFacialConsumer.class, toneAnalysisKafkaTopicName, facialAnalysisKafkaTopicName, gptResponseConsumer);
         overallFeedbackExchangesConsumer = context.getBean(OverallFeedbackExchangesConsumer.class, toneAnalysisKafkaTopicName, overallFeedbackKafkaTopicName);
     }
 
@@ -325,7 +325,7 @@ public class StreamingWebSocketHandler extends BinaryWebSocketHandler {
                         throw new RuntimeException(e);
                     }
                 })
-                .thenRun(() -> this.overallFeedback = exchangesandfacialConsumer.endChat(this.scenarioId))
+                .thenRun(() -> this.overallFeedback = exchangesAndfacialConsumer.endChat(this.scenarioId))
                 .join();
 
         long currentTime = System.currentTimeMillis();
