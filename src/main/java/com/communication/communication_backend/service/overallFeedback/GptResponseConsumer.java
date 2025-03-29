@@ -60,7 +60,7 @@ public class GptResponseConsumer {
                 consumeSpeech(record.value());
             }
         });
-        containerProperties.setGroupId("gpt-speech-response-group");
+        containerProperties.setGroupId(toneAnalysisKafkaTopicName.getHumeSpeechGptResponse());
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 
@@ -74,7 +74,7 @@ public class GptResponseConsumer {
                 consumeFace(record.value());
             }
         });
-        containerProperties.setGroupId("gpt-facial-response-group");
+        containerProperties.setGroupId(facialAnalysisKafkaTopicName.getHumeFaceGPTResponse());
         return new KafkaMessageListenerContainer<>(consumerFactory, containerProperties);
     }
 
