@@ -133,12 +133,8 @@ public class FinalOpenAiClient {
     // 3. Construct the response_format object
     //    (Note: You must have a `json_schema` key, not just `schema`.)
     Map<String, Object> responseFormat = new HashMap<>();
-    responseFormat.put("type", "json_schema");   // required
-    // you can keep name/strict if the endpoint supports them
-//    responseFormat.put("name", "mistake_summary");
-//    responseFormat.put("strict", true);
+    responseFormat.put("type", "json_schema");
 
-    // important: rename your "schema" to "json_schema"
     responseFormat.put("json_schema", jsonSchema);
 
     // 4. Build your combined messages array
