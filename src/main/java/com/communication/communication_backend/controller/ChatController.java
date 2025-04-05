@@ -1,7 +1,9 @@
 package com.communication.communication_backend.controller;
 
+import com.communication.communication_backend.service.PerConnectionWebSocketHandler;
 import com.communication.communication_backend.service.StreamingWebSocketHandler;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
@@ -12,21 +14,23 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 @Configuration
 @EnableWebSocket
 public class ChatController implements WebSocketConfigurer {
-    @Autowired
-    private StreamingWebSocketHandler streamingWebSocketHandler;
+  @Autowired
+  private PerConnectionWebSocketHandler perConnectionWebSocketHandler;
+//  @Autowired
+//  private ApplicationContext context;
 
-    @Override
-    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(streamingWebSocketHandler, "/stream")
-                .setAllowedOrigins("*");
-    }
+  @Override
+  public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+    registry.addHandler(perConnectionWebSocketHandler, "/stream")
+        .setAllowedOrigins("*");
+  }
 
-    @Bean
-    public ServletServerContainerFactoryBean createWebSocketContainer() {
-        ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
-        container.setMaxTextMessageBufferSize(500 * 1024);
-        container.setMaxBinaryMessageBufferSize(500 * 1024);
-        container.setMaxSessionIdleTimeout(30 * 60 * 1000L);
-        return container;
-    }
+  @Bean
+  public ServletServerContainerFactoryBean createWebSocketContainer() {
+    ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
+    container.setMaxTextMessageBufferSize(500 * 1024);
+    container.setMaxBinaryMessageBufferSize(500 * 1024);
+    container.setMaxSessionIdleTimeout(30 * 60 * 1000L);
+    return container;
+  }
 }
